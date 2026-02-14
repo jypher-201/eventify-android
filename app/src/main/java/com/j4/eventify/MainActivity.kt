@@ -20,7 +20,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -28,6 +27,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.j4.eventify.ui.theme.EventifyTheme
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.MaterialTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -50,10 +51,11 @@ class MainActivity : ComponentActivity() {
 fun Greeting(name: String, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     var clickCount by remember { mutableIntStateOf(0) }
+
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFFF5F5F5)),
+            .background(MaterialTheme.colorScheme.background),  // ✅ Uses theme color
         contentAlignment = Alignment.Center
     ) {
         Column(
@@ -64,23 +66,29 @@ fun Greeting(name: String, modifier: Modifier = Modifier) {
                 text = "Welcome to $name! 🎉",
                 fontSize = 28.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.Black
+                color = MaterialTheme.colorScheme.onBackground  // ✅ Uses theme color
             )
 
             Text(
                 text = "Clicked: $clickCount times",
                 fontSize = 16.sp,
-                color = Color.Gray
+                color = MaterialTheme.colorScheme.onSurfaceVariant  // ✅ Uses theme color
             )
 
-            Button(onClick = {
-                clickCount++
-                Toast.makeText(
-                    context,
-                    "Welcome to Eventify! 🎉",
-                    Toast.LENGTH_SHORT
-                ).show()
-            }) {
+            Button(
+                onClick = {
+                    clickCount++
+                    Toast.makeText(
+                        context,
+                        "Welcome to Eventify! 🎉",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.secondary,  // ✅ Blue button
+                    contentColor = MaterialTheme.colorScheme.onSecondary   // ✅ White text
+                )
+            ) {
                 Text("Get Started")
             }
         }
