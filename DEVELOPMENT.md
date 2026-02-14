@@ -456,3 +456,291 @@ refactor: Extract composables for reusability
 **Status:** 🟢 On Track  
 **Days Until MCO1 Deadline:** 16 days  
 **Current Phase 1 Progress:** 10%
+
+---
+
+## Day 2: Neo-Brutalism Color System & Custom Components
+**Date:** February 15, 2025  
+**Time Spent:** 4 hours  
+**Status:** ✅ Complete
+
+### 🎯 Goals
+- [x] Create custom color palette
+- [x] Update app theme
+- [x] Build reusable EventCard component
+- [x] Create FilterChip component
+- [x] Implement filter functionality
+- [x] Add dummy data
+- [x] Build complete home screen
+
+---
+
+### 📝 What I Built
+
+#### Hour 1-2: Color System
+**Created comprehensive color palette in `Color.kt`:**
+- Base colors (Black, White, Grays)
+- Event type colors (Blue, Pink, Yellow) with variants
+- Badge colors for type indicators
+- UI element colors (FAB, Success, Error, etc.)
+
+**Updated `Theme.kt` with custom Material 3 color scheme:**
+- EventifyLightColorScheme
+- EventifyDarkColorScheme (for future)
+- Fixed deprecated status bar API
+- Enabled edge-to-edge design
+
+#### Hour 3: EventCard Component
+**Built neo-brutalism event card with:**
+- Shadow effect using offset Box
+- Thick black border (4dp)
+- Dynamic colors based on event type
+- Type badge with contrasting color
+- Large countdown display
+- Underline decoration
+- Rounded corners (12dp)
+
+**Features:**
+```kotlin
+@Composable
+fun EventCard(
+    event: Event,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit = {}
+)
+```
+
+#### Hour 4: Complete Home Screen
+**Components created:**
+1. **EventFilterChip** - Filter buttons with selection state
+2. **EventifyTopBar** - Black curved header with title and filters
+3. **EventList** - LazyColumn with event cards
+4. **EmptyState** - "No events found" message
+5. **EventifyFAB** - Red circular floating action button
+
+**State management:**
+```kotlin
+var selectedFilter by remember { mutableStateOf<EventType?>(null) }
+```
+
+**Filtering logic:**
+```kotlin
+val filteredEvents = if (selectedFilter != null) {
+    DummyData.events.filter { it.type == selectedFilter }
+} else {
+    DummyData.events
+}
+```
+
+---
+
+### 🧠 Concepts Learned
+
+#### Advanced Modifiers
+
+**Modifier Chaining:**
+```kotlin
+Modifier
+    .fillMaxWidth()              // Size
+    .offset(x = 6.dp, y = 6.dp) // Position
+    .clip(RoundedCornerShape(12.dp))  // Shape
+    .background(Black)           // Color
+    .border(4.dp, Black)        // Border
+    .padding(20.dp)             // Spacing
+```
+
+**Order matters!** Each modifier applies to the result of the previous one.
+
+#### Shadow Effect Technique
+```kotlin
+Box {
+    // Shadow (behind)
+    Box(Modifier.offset(x = 6.dp, y = 6.dp).background(Black))
+    
+    // Content (in front)
+    Card { }
+}
+```
+
+Neo-brutalism shadows = offset solid-color box!
+
+#### When Expressions
+```kotlin
+val color = when (type) {
+    EventType.ACADEMIC -> AcademicBlue
+    EventType.PERSONAL -> PersonalPink
+    EventType.OCCASION -> OccasionYellow
+}
+```
+
+Like switch statements but returns a value.
+
+#### LazyColumn (RecyclerView in Compose)
+```kotlin
+LazyColumn {
+    items(events) { event ->
+        EventCard(event = event)
+    }
+}
+```
+
+Efficient list rendering - only renders visible items!
+
+#### Preview Functions
+```kotlin
+@Preview(showBackground = true)
+@Composable
+fun MyPreview() {
+    EventifyTheme {
+        MyComponent()
+    }
+}
+```
+
+See UI without running the app!
+
+---
+
+### ⚠️ Challenges & Solutions
+
+#### Challenge 1: Unresolved Reference 'Color'
+**Problem:** `Color(0xFF...)` didn't work in Theme.kt  
+**Cause:** Missing `import androidx.compose.ui.graphics.Color`  
+**Solution:** Added import at top of Theme.kt  
+**Learning:** Even when using custom colors from Color.kt, still need to import Color class
+
+#### Challenge 2: Deprecated Status Bar API
+**Problem:** `window.statusBarColor` showed deprecation warning  
+**Cause:** Old API from Views system  
+**Solution:** Used `WindowCompat.setDecorFitsSystemWindows()`  
+**Learning:** Material 3 prefers edge-to-edge with transparent status bar
+
+#### Challenge 3: Shadow Not Showing
+**Problem:** Shadow box invisible  
+**Cause:** Same size as main box (overlapped perfectly)  
+**Solution:** Used `.offset()` to move shadow  
+**Learning:** Offset creates the 3D effect in neo-brutalism
+
+#### Challenge 4: Filter Not Working
+**Problem:** Clicking chips didn't filter events  
+**Cause:** Forgot to update `selectedFilter` state  
+**Solution:** Properly toggle state on click  
+**Learning:** UI updates only when state changes
+
+---
+
+### 💡 Key Takeaways
+
+#### Neo-Brutalism Design Principles
+1. **Bold colors** - High saturation, no pastels
+2. **Thick borders** - 3-4dp minimum
+3. **Sharp shadows** - Solid color, not blur
+4. **High contrast** - Black on bright colors
+5. **Geometric shapes** - Rectangles, circles (no complex shapes)
+
+#### Compose Best Practices Discovered
+1. ✅ Extract reusable components early
+2. ✅ Use preview functions extensively
+3. ✅ Keep composables small and focused
+4. ✅ Use `when` for conditional styling
+5. ✅ Leverage Modifier chaining
+6. ✅ Use `remember` for local state
+7. ✅ Use data classes for structured data
+
+#### Component Design Pattern
+```kotlin
+@Composable
+fun MyComponent(
+    data: DataClass,              // Required data
+    modifier: Modifier = Modifier, // Always include
+    onClick: () -> Unit = {}      // Optional callbacks
+) {
+    // Implementation
+}
+```
+
+---
+
+### 📚 New Compose Components Used
+
+| Component | Purpose | Key Properties |
+|-----------|---------|----------------|
+| `LazyColumn` | Efficient scrolling list | `items()`, `contentPadding` |
+| `Scaffold` | App structure | `topBar`, `floatingActionButton` |
+| `FloatingActionButton` | Floating action | `containerColor`, `elevation` |
+| `Box` | Layering/positioning | `contentAlignment`, `matchParentSize` |
+| `Row` | Horizontal layout | `horizontalArrangement` |
+| `Column` | Vertical layout | `verticalArrangement` |
+
+---
+
+### 🎨 Design Decisions
+
+**Why these colors?**
+- Blue (Academic) = Trust, professionalism
+- Pink (Personal) = Energy, personal
+- Yellow (Occasion) = Celebration, joy
+
+**Why thick borders?**
+- Visual hierarchy
+- Neo-brutalism aesthetic
+- Makes cards "pop"
+
+**Why shadows instead of elevation?**
+- More control over shadow appearance
+- Consistent with neo-brutalism style
+- Works better with thick borders
+
+---
+
+### 📊 Day 2 Metrics
+
+| Metric | Target | Actual | Status |
+|--------|--------|--------|--------|
+| Hours Spent | 4 | 4 | ✅ |
+| Components Created | 5+ | 7 | ✅ |
+| Commits | 2+ | 2 | ✅ |
+| Previews Created | 5+ | 8 | ✅ |
+| Bugs | 0 | 4 fixed | ✅ |
+
+---
+
+### 🎯 Self-Assessment
+
+**What Went Well:**
+- ✅ Colors look amazing!
+- ✅ Neo-brutalism style achieved
+- ✅ Filter functionality works perfectly
+- ✅ Preview functions speed up development
+- ✅ Code is clean and reusable
+
+**What Was Challenging:**
+- ⚠️ Understanding modifier order
+- ⚠️ Getting shadow positioning right
+- ⚠️ Fixing deprecated APIs
+
+**What I'll Do Better Tomorrow:**
+- 💡 Plan component structure before coding
+- 💡 Write preview functions first (TDD style)
+- 💡 Use more Kotlin extensions
+
+**Confidence Level:** 🟢 Very High (9/10)
+
+---
+
+### 📅 Tomorrow's Plan (Day 3)
+
+#### Goals:
+- [ ] Create Add Event screen layout
+- [ ] Build text input fields
+- [ ] Create date/time picker UI (dummy)
+- [ ] Add save button
+- [ ] Practice form layouts
+
+**Estimated Time:** 3 hours
+
+---
+
+**Next Entry:** Day 3 - Add Event Screen  
+**Status:** 🟢 Ahead of Schedule  
+**Phase 1 Progress:** 25%
