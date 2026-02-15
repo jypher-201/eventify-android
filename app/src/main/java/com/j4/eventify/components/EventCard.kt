@@ -31,18 +31,21 @@ import com.j4.eventify.ui.theme.OccasionYellow
 import com.j4.eventify.ui.theme.PersonalPink
 import com.j4.eventify.ui.theme.White
 
-/**
- * Event types for categorization
- */
+// ============ DATA MODELS ============
+
 enum class EventType {
     ACADEMIC,
     PERSONAL,
     OCCASION
 }
 
-/**
- * Data class representing an event
- */
+enum class TimeFilter {
+    RECENT,
+    THIS_WEEK,
+    THIS_MONTH,
+    ALL_TIME
+}
+
 data class Event(
     val id: Int,
     val title: String,
@@ -53,23 +56,14 @@ data class Event(
     val notes: String = ""
 )
 
-/**
- * Neo-brutalism style event card
- *
- * Features:
- * - Bold colors based on event type
- * - Thick black border
- * - Drop shadow effect
- * - Type badge
- * - Large countdown display
- */
+// ============ UI COMPONENT ============
+
 @Composable
 fun EventCard(
     event: Event,
     modifier: Modifier = Modifier,
     onClick: () -> Unit = {}
 ) {
-    // Determine colors based on event type
     val backgroundColor = when (event.type) {
         EventType.ACADEMIC -> AcademicBlue
         EventType.PERSONAL -> PersonalPink
@@ -78,43 +72,34 @@ fun EventCard(
 
     val badgeColor = when (event.type) {
         EventType.ACADEMIC -> BadgeAcademic
-        EventType.PERSONAL -> Color(0xFF00E676)  // Green
-        EventType.OCCASION -> Color(0xFF9C27B0)  // Purple
+        EventType.PERSONAL -> Color(0xFF00E676)
+        EventType.OCCASION -> Color(0xFF9C27B0)
     }
 
     val textColor = when (event.type) {
-        EventType.OCCASION -> Black  // Black text on yellow
-        else -> White                // White text on blue/pink
+        EventType.OCCASION -> Black
+        else -> White
     }
 
-    // Shadow layer (positioned behind main card)
     Box(modifier = modifier) {
-        // Shadow
         Box(
             modifier = Modifier
                 .matchParentSize()
-                .offset(x = 6.dp, y = 6.dp)  // Shadow offset
+                .offset(x = 6.dp, y = 6.dp)
                 .clip(RoundedCornerShape(12.dp))
                 .background(Black)
         )
 
-        // Main card
         Card(
             onClick = onClick,
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = backgroundColor
-            ),
-            elevation = CardDefaults.cardElevation(0.dp)  // No Material elevation
+            colors = CardDefaults.cardColors(containerColor = backgroundColor),
+            elevation = CardDefaults.cardElevation(0.dp)
         ) {
             Box(
                 modifier = Modifier
-                    .border(
-                        width = 4.dp,
-                        color = Black,
-                        shape = RoundedCornerShape(12.dp)
-                    )
+                    .border(4.dp, Black, RoundedCornerShape(12.dp))
                     .padding(20.dp)
             ) {
                 Row(
@@ -122,12 +107,10 @@ fun EventCard(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Left side: Event info
                     Column(
                         modifier = Modifier.weight(1f),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        // Event title
                         Text(
                             text = event.title,
                             fontSize = 22.sp,
@@ -136,7 +119,6 @@ fun EventCard(
                             lineHeight = 26.sp
                         )
 
-                        // Underline decoration
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth(0.6f)
@@ -145,7 +127,6 @@ fun EventCard(
                                 .padding(vertical = 1.5.dp)
                         )
 
-                        // Date/time
                         Text(
                             text = event.dateTime,
                             fontSize = 14.sp,
@@ -153,7 +134,6 @@ fun EventCard(
                             color = textColor.copy(alpha = 0.8f)
                         )
 
-                        // Event type badge
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(4.dp))
@@ -169,12 +149,10 @@ fun EventCard(
                         }
                     }
 
-                    // Right side: Countdown
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
-                        // Big number
                         Text(
                             text = event.countdownNumber,
                             fontSize = 56.sp,
@@ -183,7 +161,6 @@ fun EventCard(
                             lineHeight = 56.sp
                         )
 
-                        // Label
                         Text(
                             text = event.countdownLabel,
                             fontSize = 14.sp,
@@ -198,7 +175,8 @@ fun EventCard(
     }
 }
 
-// Preview with Academic event
+// ============ PREVIEWS ============
+
 @Preview(showBackground = true)
 @Composable
 fun EventCardAcademicPreview() {
@@ -222,7 +200,6 @@ fun EventCardAcademicPreview() {
     }
 }
 
-// Preview with Personal event
 @Preview(showBackground = true)
 @Composable
 fun EventCardPersonalPreview() {
@@ -246,7 +223,6 @@ fun EventCardPersonalPreview() {
     }
 }
 
-// Preview with Occasion event
 @Preview(showBackground = true)
 @Composable
 fun EventCardOccasionPreview() {
@@ -262,53 +238,6 @@ fun EventCardOccasionPreview() {
                     title = "Birthday Party",
                     type = EventType.OCCASION,
                     dateTime = "Today at 7:00 PM",
-                    countdownNumber = "NOW",
-                    countdownLabel = "HAPPENING"
-                )
-            )
-        }
-    }
-}
-
-// Preview with all three types
-@Preview(showBackground = true, heightDp = 600)
-@Composable
-fun EventCardAllTypesPreview() {
-    EventifyTheme {
-        Column(
-            modifier = Modifier
-                .background(MaterialTheme.colorScheme.background)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            EventCard(
-                event = Event(
-                    id = 1,
-                    title = "Final Exam - Mobile Dev",
-                    type = EventType.ACADEMIC,
-                    dateTime = "Due: Mar 8, 2024",
-                    countdownNumber = "12",
-                    countdownLabel = "DAYS LEFT"
-                )
-            )
-
-            EventCard(
-                event = Event(
-                    id = 2,
-                    title = "Concert - Ben&Ben",
-                    type = EventType.PERSONAL,
-                    dateTime = "Mar 15, 2024",
-                    countdownNumber = "19",
-                    countdownLabel = "DAYS LEFT"
-                )
-            )
-
-            EventCard(
-                event = Event(
-                    id = 3,
-                    title = "Graduation Day",
-                    type = EventType.OCCASION,
-                    dateTime = "Today at 3:00 PM",
                     countdownNumber = "NOW",
                     countdownLabel = "HAPPENING"
                 )

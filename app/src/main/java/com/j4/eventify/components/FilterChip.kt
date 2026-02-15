@@ -27,13 +27,7 @@ import com.j4.eventify.ui.theme.PersonalPink
 import com.j4.eventify.ui.theme.White
 
 /**
- * Neo-brutalism style filter chip
- *
- * Features:
- * - Bold color based on event type
- * - Thick black border
- * - No rounded corners (sharp edges)
- * - Clear selected/unselected states
+ * Neo-brutalism style filter chip for event types
  */
 @Composable
 fun EventFilterChip(
@@ -43,9 +37,16 @@ fun EventFilterChip(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val isLightBackground = backgroundColor == White ||
+            backgroundColor == Color(0xFFF5F5F5)
+
     val containerColor = if (selected) backgroundColor else White
     val contentColor = if (selected) {
-        if (backgroundColor == OccasionYellow) Black else White
+        when {
+            backgroundColor == OccasionYellow -> Black
+            isLightBackground -> Black
+            else -> White
+        }
     } else {
         Black
     }
@@ -53,7 +54,7 @@ fun EventFilterChip(
 
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(50))  // Pill shape
+            .clip(RoundedCornerShape(50))
             .background(containerColor)
             .border(
                 width = borderWidth,
@@ -73,7 +74,49 @@ fun EventFilterChip(
     }
 }
 
-// Previews
+/**
+ * Time filter chip (gray/dark style for secondary filters)
+ *
+ * This is a SECONDARY filter chip used for time-based filtering.
+ * Uses gray color scheme to differentiate from primary event type filters.
+ */
+@Composable
+fun TimeFilterChip(
+    text: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    // Gray when selected, white when not
+    val containerColor = if (selected) Color(0xFF424242) else White
+    val contentColor = if (selected) White else Black
+    val borderWidth = if (selected) 3.dp else 2.dp
+
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(50))
+            .background(containerColor)
+            .border(
+                width = borderWidth,
+                color = Black,
+                shape = RoundedCornerShape(50)
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+            color = contentColor
+        )
+    }
+}
+
+// ============ PREVIEWS ============
+
+// Event Filter Chip Previews
 @Preview
 @Composable
 fun FilterChipAcademicSelectedPreview() {
@@ -141,6 +184,49 @@ fun FilterChipsRowPreview() {
                 backgroundColor = OccasionYellow,
                 onClick = {}
             )
+        }
+    }
+}
+
+// Time Filter Chip Previews
+@Preview
+@Composable
+fun TimeFilterChipSelectedPreview() {
+    EventifyTheme {
+        TimeFilterChip(
+            text = "This Week",
+            selected = true,
+            onClick = {}
+        )
+    }
+}
+
+@Preview
+@Composable
+fun TimeFilterChipUnselectedPreview() {
+    EventifyTheme {
+        TimeFilterChip(
+            text = "Recent",
+            selected = false,
+            onClick = {}
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun TimeFilterChipsRowPreview() {
+    EventifyTheme {
+        Row(
+            modifier = Modifier
+                .background(MaterialTheme.colorScheme.background)
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            TimeFilterChip(text = "Recent", selected = false, onClick = {})
+            TimeFilterChip(text = "This Week", selected = true, onClick = {})
+            TimeFilterChip(text = "This Month", selected = false, onClick = {})
+            TimeFilterChip(text = "All Time", selected = false, onClick = {})
         }
     }
 }

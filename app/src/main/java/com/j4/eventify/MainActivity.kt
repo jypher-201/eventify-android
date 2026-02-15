@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
@@ -44,6 +46,8 @@ import com.j4.eventify.ui.theme.FABRed
 import com.j4.eventify.ui.theme.OccasionYellow
 import com.j4.eventify.ui.theme.PersonalPink
 import com.j4.eventify.ui.theme.White
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -109,7 +113,7 @@ object DummyData {
 fun EventifyHomeScreen() {
     var selectedFilter by remember { mutableStateOf<EventType?>(null) }
 
-    // Filter events based on selection
+    // Filter events based on type
     val filteredEvents = if (selectedFilter != null) {
         DummyData.events.filter { it.type == selectedFilter }
     } else {
@@ -120,7 +124,8 @@ fun EventifyHomeScreen() {
         topBar = {
             EventifyTopBar(
                 selectedFilter = selectedFilter,
-                onFilterSelected = { selectedFilter = it }
+                onFilterSelected = { selectedFilter = it },
+                eventCount = filteredEvents.size
             )
         },
         floatingActionButton = {
@@ -141,64 +146,89 @@ fun EventifyHomeScreen() {
 @Composable
 fun EventifyTopBar(
     selectedFilter: EventType?,
-    onFilterSelected: (EventType?) -> Unit
+    onFilterSelected: (EventType?) -> Unit,
+    eventCount: Int = 0
 ) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .background(Black)
             .clip(RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp))
-            .padding(top = 48.dp, bottom = 16.dp, start = 16.dp, end = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Title
-        Text(
-            text = "EVENTIFY",
-            fontSize = 32.sp,
-            fontWeight = FontWeight.Bold,
-            color = White,
-            letterSpacing = 2.sp
-        )
+        // Title and count
+        Column(
+            modifier = Modifier.padding(top = 48.dp, start = 16.dp, end = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = "EVENTIFY",
+                fontSize = 32.sp,
+                fontWeight = FontWeight.Bold,
+                color = White,
+                letterSpacing = 2.sp
+            )
+
+            Text(
+                text = buildSimpleEventCountText(selectedFilter, eventCount),
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Normal,
+                color = White.copy(alpha = 0.8f)
+            )
+        }
 
         // Filter chips
         Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(top = 16.dp, bottom = 16.dp)
+                .padding(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            EventFilterChip(
+                text = "All",
+                selected = selectedFilter == null,
+                backgroundColor = White,
+                onClick = { onFilterSelected(null) }
+            )
+
             EventFilterChip(
                 text = "Academic",
                 selected = selectedFilter == EventType.ACADEMIC,
                 backgroundColor = AcademicBlue,
-                onClick = {
-                    onFilterSelected(
-                        if (selectedFilter == EventType.ACADEMIC) null
-                        else EventType.ACADEMIC
-                    )
-                }
+                onClick = { onFilterSelected(EventType.ACADEMIC) }
             )
+
             EventFilterChip(
                 text = "Personal",
                 selected = selectedFilter == EventType.PERSONAL,
                 backgroundColor = PersonalPink,
-                onClick = {
-                    onFilterSelected(
-                        if (selectedFilter == EventType.PERSONAL) null
-                        else EventType.PERSONAL
-                    )
-                }
+                onClick = { onFilterSelected(EventType.PERSONAL) }
             )
+
             EventFilterChip(
                 text = "Occasion",
                 selected = selectedFilter == EventType.OCCASION,
                 backgroundColor = OccasionYellow,
-                onClick = {
-                    onFilterSelected(
-                        if (selectedFilter == EventType.OCCASION) null
-                        else EventType.OCCASION
-                    )
-                }
+                onClick = { onFilterSelected(EventType.OCCASION) }
             )
         }
     }
+}
+
+// Simplified helper function
+fun buildSimpleEventCountText(
+    filter: EventType?,
+    count: Int
+): String {
+    val filterText = when (filter) {
+        null -> "All Events"
+        EventType.ACADEMIC -> "Academic"
+        EventType.PERSONAL -> "Personal"
+        EventType.OCCASION -> "Occasion"
+    }
+
+    return "$filterText • $count ${if (count == 1) "event" else "events"}"
 }
 
 @Composable
@@ -249,9 +279,15 @@ fun EmptyState(modifier: Modifier = Modifier) {
 
 @Composable
 fun EventifyFAB() {
+    val context = LocalContext.current
+
     FloatingActionButton(
         onClick = {
-            // TODO: Navigate to add event screen
+            Toast.makeText(
+                context,
+                "Add Event screen (Navigation coming in Day 7!)",
+                Toast.LENGTH_SHORT
+            ).show()
         },
         containerColor = FABRed,
         contentColor = White,
