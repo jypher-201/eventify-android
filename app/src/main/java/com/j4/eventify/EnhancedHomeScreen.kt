@@ -28,6 +28,13 @@ import com.j4.eventify.components.EventCard
 import com.j4.eventify.components.EventType
 import com.j4.eventify.ui.theme.*
 import kotlinx.coroutines.launch
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.ui.graphics.SolidColor
 
 enum class ViewMode {
     LIST,
@@ -155,169 +162,266 @@ fun KeepStyleTopBar(
     onShowSortMenuChange: (Boolean) -> Unit,
     onMenuClick: () -> Unit
 ) {
+    var isSearchExpanded by remember { mutableStateOf(false) }
+    val focusRequester = remember { FocusRequester() }
+    val focusManager = LocalFocusManager.current
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .background(White)
-            .statusBarsPadding()  // ← This pushes content below status bar!
+            .statusBarsPadding()
     ) {
-        // Top bar with search
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            // Hamburger menu
-            IconButton(
-                onClick = onMenuClick,
-                modifier = Modifier.size(44.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Menu,
-                    contentDescription = "Menu",
-                    tint = Black,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-
-            // Search bar
-            TextField(
-                value = searchQuery,
-                onValueChange = onSearchQueryChange,
+        if (isSearchExpanded) {
+            // EXPANDED SEARCH MODE
+            Row(
                 modifier = Modifier
-                    .weight(1f)
-                    .height(48.dp)
-                    .clip(RoundedCornerShape(28.dp)),
-                placeholder = {
-                    Text(
-                        text = "Search events",
-                        color = Color.Gray,
-                        fontSize = 16.sp
-                    )
-                },
-                leadingIcon = {
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Back button
+                IconButton(
+                    onClick = {
+                        isSearchExpanded = false
+                        onSearchQueryChange("")
+                        focusManager.clearFocus()
+                    },
+                    modifier = Modifier.size(44.dp)
+                ) {
                     Icon(
-                        imageVector = Icons.Default.Search,
-                        contentDescription = "Search",
-                        tint = Color.Gray,
-                        modifier = Modifier.size(20.dp)
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Back",
+                        tint = Black,
+                        modifier = Modifier.size(24.dp)
                     )
-                },
-                trailingIcon = {
+                }
+
+                // Expanded Search bar
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(48.dp)
+                        .clip(RoundedCornerShape(28.dp))
+                        .background(Color(0xFFF1F3F4))
+                ) {
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(0.dp),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 16.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Sort button
-                        Box {
+                        Box(
+                            modifier = Modifier.weight(1f),
+                            contentAlignment = Alignment.CenterStart
+                        ) {
+                            // Placeholder
+                            if (searchQuery.isEmpty()) {
+                                Text(
+                                    text = "Search events",
+                                    color = Color.Gray,
+                                    fontSize = 16.sp
+                                )
+                            }
+
+                            // BasicTextField
+                            BasicTextField(
+                                value = searchQuery,
+                                onValueChange = onSearchQueryChange,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .focusRequester(focusRequester),
+                                textStyle = androidx.compose.ui.text.TextStyle(
+                                    fontSize = 16.sp,
+                                    color = Black
+                                ),
+                                singleLine = true,
+                                cursorBrush = SolidColor(Black)
+                            )
+                        }
+
+                        // Clear button
+                        if (searchQuery.isNotEmpty()) {
                             IconButton(
-                                onClick = { onShowSortMenuChange(true) },
+                                onClick = { onSearchQueryChange("") },
                                 modifier = Modifier.size(36.dp)
                             ) {
                                 Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.Sort,
-                                    contentDescription = "Sort",
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Clear",
                                     tint = Black,
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
+                        }
+                    }
+                }
+            }
 
-                            // Sort dropdown
-                            DropdownMenu(
-                                expanded = showSortMenu,
-                                onDismissRequest = { onShowSortMenuChange(false) },
-                                modifier = Modifier.background(White)
+            LaunchedEffect(isSearchExpanded) {
+                if (isSearchExpanded) {
+                    focusRequester.requestFocus()
+                }
+            }
+
+        } else {
+            // NORMAL MODE (Collapsed)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Hamburger menu
+                IconButton(
+                    onClick = onMenuClick,
+                    modifier = Modifier.size(44.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Menu,
+                        contentDescription = "Menu",
+                        tint = Black,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+
+                // Collapsed Search bar
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(48.dp)
+                        .clip(RoundedCornerShape(28.dp))
+                        .background(Color(0xFFF1F3F4))
+                        .clickable { isSearchExpanded = true },
+                    contentAlignment = Alignment.CenterStart
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Search,
+                                contentDescription = "Search",
+                                tint = Color.Gray,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Text(
+                                text = "Search events",
+                                color = Color.Gray,
+                                fontSize = 16.sp
+                            )
+                        }
+
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(0.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Sort button
+                            Box {
+                                IconButton(
+                                    onClick = { onShowSortMenuChange(true) },
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.Sort,
+                                        contentDescription = "Sort",
+                                        tint = Black,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+
+                                DropdownMenu(
+                                    expanded = showSortMenu,
+                                    onDismissRequest = { onShowSortMenuChange(false) },
+                                    modifier = Modifier.background(White)
+                                ) {
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(
+                                                "Sort by Date",
+                                                fontWeight = if (sortOption == SortOption.DATE) FontWeight.Bold else FontWeight.Normal
+                                            )
+                                        },
+                                        onClick = {
+                                            onSortOptionChange(SortOption.DATE)
+                                            onShowSortMenuChange(false)
+                                        }
+                                    )
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(
+                                                "Sort by Type",
+                                                fontWeight = if (sortOption == SortOption.TYPE) FontWeight.Bold else FontWeight.Normal
+                                            )
+                                        },
+                                        onClick = {
+                                            onSortOptionChange(SortOption.TYPE)
+                                            onShowSortMenuChange(false)
+                                        }
+                                    )
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(
+                                                "Sort by Name",
+                                                fontWeight = if (sortOption == SortOption.NAME) FontWeight.Bold else FontWeight.Normal
+                                            )
+                                        },
+                                        onClick = {
+                                            onSortOptionChange(SortOption.NAME)
+                                            onShowSortMenuChange(false)
+                                        }
+                                    )
+                                }
+                            }
+
+                            // View mode toggle
+                            IconButton(
+                                onClick = {
+                                    onViewModeChange(
+                                        if (viewMode == ViewMode.LIST) ViewMode.GRID else ViewMode.LIST
+                                    )
+                                },
+                                modifier = Modifier.size(36.dp)
                             ) {
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            "Sort by Date",
-                                            fontWeight = if (sortOption == SortOption.DATE) FontWeight.Bold else FontWeight.Normal
-                                        )
-                                    },
-                                    onClick = {
-                                        onSortOptionChange(SortOption.DATE)
-                                        onShowSortMenuChange(false)
-                                    }
-                                )
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            "Sort by Type",
-                                            fontWeight = if (sortOption == SortOption.TYPE) FontWeight.Bold else FontWeight.Normal
-                                        )
-                                    },
-                                    onClick = {
-                                        onSortOptionChange(SortOption.TYPE)
-                                        onShowSortMenuChange(false)
-                                    }
-                                )
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            "Sort by Name",
-                                            fontWeight = if (sortOption == SortOption.NAME) FontWeight.Bold else FontWeight.Normal
-                                        )
-                                    },
-                                    onClick = {
-                                        onSortOptionChange(SortOption.NAME)
-                                        onShowSortMenuChange(false)
-                                    }
+                                Icon(
+                                    imageVector = if (viewMode == ViewMode.LIST)
+                                        Icons.Default.GridView
+                                    else
+                                        Icons.Default.ViewAgenda,
+                                    contentDescription = "Toggle view",
+                                    tint = Black,
+                                    modifier = Modifier.size(20.dp)
                                 )
                             }
                         }
-
-                        // View mode toggle
-                        IconButton(
-                            onClick = {
-                                onViewModeChange(
-                                    if (viewMode == ViewMode.LIST) ViewMode.GRID else ViewMode.LIST
-                                )
-                            },
-                            modifier = Modifier.size(36.dp)
-                        ) {
-                            Icon(
-                                imageVector = if (viewMode == ViewMode.LIST)
-                                    Icons.Default.GridView
-                                else
-                                    Icons.Default.ViewAgenda,
-                                contentDescription = "Toggle view",
-                                tint = Black,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
                     }
-                },
-                colors = TextFieldDefaults.colors(
-                    focusedContainerColor = Color(0xFFF1F3F4),
-                    unfocusedContainerColor = Color(0xFFF1F3F4),
-                    focusedIndicatorColor = Color.Transparent,
-                    unfocusedIndicatorColor = Color.Transparent,
-                    focusedTextColor = Black,
-                    unfocusedTextColor = Black,
-                    cursorColor = Black
-                ),
-                singleLine = true,
-                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 16.sp)
-            )
+                }
 
-            // Profile/Logo
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .background(Black)
-                    .clickable { /* TODO: Profile menu */ },
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "E",
-                    color = White,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                // Profile/Logo
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(Black)
+                        .clickable { /* TODO: Profile menu */ },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "E",
+                        color = White,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
         }
 

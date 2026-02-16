@@ -100,7 +100,7 @@ fun EventCard(
             Box(
                 modifier = Modifier
                     .border(4.dp, Black, RoundedCornerShape(12.dp))
-                    .padding(20.dp)
+                    .padding(16.dp)  // ← Changed from 20.dp to 16.dp
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -109,27 +109,27 @@ fun EventCard(
                 ) {
                     Column(
                         modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        verticalArrangement = Arrangement.spacedBy(6.dp)  // ← Changed from 8.dp to 6.dp
                     ) {
                         Text(
                             text = event.title,
-                            fontSize = 22.sp,
+                            fontSize = 18.sp,  // ← Changed from 22.sp to 18.sp
                             fontWeight = FontWeight.Bold,
                             color = textColor,
-                            lineHeight = 26.sp
+                            lineHeight = 22.sp  // ← Changed from 26.sp to 22.sp
                         )
 
                         Box(
                             modifier = Modifier
-                                .fillMaxWidth(0.6f)
-                                .padding(top = 4.dp)
+                                .fillMaxWidth(0.5f)  // ← Changed from 0.6f to 0.5f (shorter underline)
+                                .padding(top = 2.dp)  // ← Changed from 4.dp to 2.dp
                                 .background(textColor)
-                                .padding(vertical = 1.5.dp)
+                                .padding(vertical = 1.dp)  // ← Changed from 1.5.dp to 1.dp
                         )
 
                         Text(
                             text = event.dateTime,
-                            fontSize = 14.sp,
+                            fontSize = 12.sp,  // ← Changed from 14.sp to 12.sp
                             fontWeight = FontWeight.Bold,
                             color = textColor.copy(alpha = 0.8f)
                         )
@@ -138,11 +138,11 @@ fun EventCard(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(4.dp))
                                 .background(badgeColor)
-                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                                .padding(horizontal = 10.dp, vertical = 4.dp)  // ← Changed from 12.dp, 6.dp to 10.dp, 4.dp
                         ) {
                             Text(
                                 text = event.type.name,
-                                fontSize = 12.sp,
+                                fontSize = 11.sp,  // ← Changed from 12.sp to 11.sp
                                 fontWeight = FontWeight.Bold,
                                 color = Black
                             )
@@ -155,15 +155,15 @@ fun EventCard(
                     ) {
                         Text(
                             text = event.countdownNumber,
-                            fontSize = 56.sp,
+                            fontSize = 42.sp,  // ← Changed from 56.sp to 42.sp
                             fontWeight = FontWeight.Bold,
                             color = textColor,
-                            lineHeight = 56.sp
+                            lineHeight = 42.sp  // ← Changed from 56.sp to 42.sp
                         )
 
                         Text(
                             text = event.countdownLabel,
-                            fontSize = 14.sp,
+                            fontSize = 12.sp,  // ← Changed from 14.sp to 12.sp
                             fontWeight = FontWeight.Bold,
                             color = textColor,
                             letterSpacing = 0.5.sp
@@ -174,7 +174,6 @@ fun EventCard(
         }
     }
 }
-
 // ============ PREVIEWS ============
 
 @Preview(showBackground = true)
