@@ -159,21 +159,26 @@ fun KeepStyleTopBar(
         modifier = Modifier
             .fillMaxWidth()
             .background(White)
+            .statusBarsPadding()  // ← This pushes content below status bar!
     ) {
         // Top bar with search
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 12.dp),
+                .padding(horizontal = 8.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             // Hamburger menu
-            IconButton(onClick = onMenuClick) {
+            IconButton(
+                onClick = onMenuClick,
+                modifier = Modifier.size(44.dp)
+            ) {
                 Icon(
                     imageVector = Icons.Default.Menu,
                     contentDescription = "Menu",
-                    tint = Black
+                    tint = Black,
+                    modifier = Modifier.size(24.dp)
                 )
             }
 
@@ -183,35 +188,39 @@ fun KeepStyleTopBar(
                 onValueChange = onSearchQueryChange,
                 modifier = Modifier
                     .weight(1f)
-                    .clip(RoundedCornerShape(24.dp)),
+                    .height(48.dp)
+                    .clip(RoundedCornerShape(28.dp)),
                 placeholder = {
                     Text(
                         text = "Search events",
-                        color = Color.Gray
+                        color = Color.Gray,
+                        fontSize = 16.sp
                     )
                 },
                 leadingIcon = {
                     Icon(
                         imageVector = Icons.Default.Search,
                         contentDescription = "Search",
-                        tint = Color.Gray
+                        tint = Color.Gray,
+                        modifier = Modifier.size(20.dp)
                     )
                 },
                 trailingIcon = {
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(0.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         // Sort button
                         Box {
                             IconButton(
                                 onClick = { onShowSortMenuChange(true) },
-                                modifier = Modifier.size(40.dp)
+                                modifier = Modifier.size(36.dp)
                             ) {
                                 Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.Sort,  // ✅ Fixed
+                                    imageVector = Icons.AutoMirrored.Filled.Sort,
                                     contentDescription = "Sort",
-                                    tint = Black
+                                    tint = Black,
+                                    modifier = Modifier.size(20.dp)
                                 )
                             }
 
@@ -267,7 +276,7 @@ fun KeepStyleTopBar(
                                     if (viewMode == ViewMode.LIST) ViewMode.GRID else ViewMode.LIST
                                 )
                             },
-                            modifier = Modifier.size(40.dp)
+                            modifier = Modifier.size(36.dp)
                         ) {
                             Icon(
                                 imageVector = if (viewMode == ViewMode.LIST)
@@ -275,7 +284,8 @@ fun KeepStyleTopBar(
                                 else
                                     Icons.Default.ViewAgenda,
                                 contentDescription = "Toggle view",
-                                tint = Black
+                                tint = Black,
+                                modifier = Modifier.size(20.dp)
                             )
                         }
                     }
@@ -286,15 +296,17 @@ fun KeepStyleTopBar(
                     focusedIndicatorColor = Color.Transparent,
                     unfocusedIndicatorColor = Color.Transparent,
                     focusedTextColor = Black,
-                    unfocusedTextColor = Black
+                    unfocusedTextColor = Black,
+                    cursorColor = Black
                 ),
-                singleLine = true
+                singleLine = true,
+                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 16.sp)
             )
 
             // Profile/Logo
             Box(
                 modifier = Modifier
-                    .size(40.dp)
+                    .size(36.dp)
                     .clip(CircleShape)
                     .background(Black)
                     .clickable { /* TODO: Profile menu */ },
@@ -303,16 +315,15 @@ fun KeepStyleTopBar(
                 Text(
                     text = "E",
                     color = White,
-                    fontSize = 20.sp,
+                    fontSize = 18.sp,
                     fontWeight = FontWeight.Bold
                 )
             }
         }
 
-        HorizontalDivider(color = Color(0xFFE0E0E0), thickness = 1.dp)  // ✅ Fixed
+        HorizontalDivider(color = Color(0xFFE0E0E0), thickness = 1.dp)
     }
 }
-
 @Composable
 fun DrawerContent(
     selectedFilter: EventType?,
