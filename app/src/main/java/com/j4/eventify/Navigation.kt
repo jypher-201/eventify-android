@@ -54,7 +54,7 @@ fun EventifyNavigation() {
             )
         }
 
-        // Event Details Screen
+        // Event Details Screen - NOW SHOWS COUNTDOWN TIMER
         composable(
             route = Routes.EVENT_DETAILS,
             arguments = listOf(
@@ -69,7 +69,7 @@ fun EventifyNavigation() {
             val event = DummyData.events.find { it.id == eventId }
 
             if (event != null) {
-                EventDetailsScreen(
+                CountdownTimerScreen(  // ← Changed from EventDetailsScreen
                     event = event,
                     onNavigateBack = {
                         navController.popBackStack()
