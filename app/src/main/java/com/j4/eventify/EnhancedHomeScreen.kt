@@ -4,9 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -64,27 +61,27 @@ fun EnhancedHomeScreen(
     var sortOption by remember { mutableStateOf(SortOption.DATE) }
     var showSortMenu by remember { mutableStateOf(false) }
 
-    // Filter and sort events
+
     val filteredAndSortedEvents = remember(selectedFilter, searchQuery, sortOption) {
-        var events = if (selectedFilter != null) {
+        val filtered = if (selectedFilter != null) {
             DummyData.events.filter { it.type == selectedFilter }
         } else {
             DummyData.events
         }
 
-        // Search filter
-        if (searchQuery.isNotBlank()) {
-            events = events.filter {
+        val searched = if (searchQuery.isNotBlank()) {
+            filtered.filter {
                 it.title.contains(searchQuery, ignoreCase = true) ||
                         it.notes.contains(searchQuery, ignoreCase = true)
             }
+        } else {
+            filtered
         }
 
-        // Sort
         when (sortOption) {
-            SortOption.DATE -> events.sortedBy { it.dateTime }
-            SortOption.TYPE -> events.sortedBy { it.type.name }
-            SortOption.NAME -> events.sortedBy { it.title }
+            SortOption.DATE -> searched.sortedBy { it.dateTime }
+            SortOption.TYPE -> searched.sortedBy { it.type.name }
+            SortOption.NAME -> searched.sortedBy { it.title }
         }
     }
 
@@ -137,8 +134,8 @@ fun EnhancedHomeScreen(
                                 modifier = Modifier.padding(paddingValues)
                             )
                         }
-                        ViewMode.CALENDAR -> {  // ← Changed from GRID
-                            EventCalendarView(
+                        ViewMode.CALENDAR -> {
+                            CalendarView(  // ← Updated to use new CalendarView
                                 events = filteredAndSortedEvents,
                                 onEventClick = onNavigateToEventDetails,
                                 modifier = Modifier.padding(paddingValues)
@@ -560,73 +557,6 @@ fun EventListView(
                 event = event,
                 onClick = { onEventClick(event.id) }
             )
-        }
-    }
-}
-@Composable
-fun EventCalendarView(
-    events: List<Event>,
-    onEventClick: (Int) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    // Group events by date
-    val eventsByDate = remember(events) {
-        events.groupBy { event ->
-            // Extract date from dateTime string
-            // For now, we'll use the full dateTime as the key
-            event.dateTime.substringBefore(" at").substringBefore(",")
-        }
-    }
-
-    LazyColumn(
-        modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp)
-    ) {
-        eventsByDate.forEach { (date, eventsOnDate) ->
-            item {
-                // Date header
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    // Date label
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(6.dp)
-                                .clip(CircleShape)
-                                .background(Black)
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text(
-                            text = date,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Black
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        HorizontalDivider(
-                            modifier = Modifier.weight(1f),
-                            thickness = 2.dp,
-                            color = Black
-                        )
-                    }
-
-                    // Events on this date
-                    eventsOnDate.forEach { event ->
-                        EventCard(
-                            event = event,
-                            onClick = { onEventClick(event.id) }
-                        )
-                    }
-                }
-            }
         }
     }
 }

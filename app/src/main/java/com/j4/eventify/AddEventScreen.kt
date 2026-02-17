@@ -663,14 +663,6 @@ fun RepeatOptionsDialog(
     )
 }
 
-fun getEventTypeColor(type: EventType): Color {
-    return when (type) {
-        EventType.ACADEMIC -> AcademicBlue
-        EventType.PERSONAL -> PersonalPink
-        EventType.OCCASION -> OccasionYellow
-    }
-}
-
 @Preview(showBackground = true, showSystemUi = true)
 @Composable
 fun AddEventScreenPreview() {
