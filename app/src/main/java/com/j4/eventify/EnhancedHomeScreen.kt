@@ -35,10 +35,12 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Notifications
 
 enum class ViewMode {
     LIST,
-    GRID
+    CALENDAR
 }
 
 enum class SortOption {
@@ -135,8 +137,8 @@ fun EnhancedHomeScreen(
                                 modifier = Modifier.padding(paddingValues)
                             )
                         }
-                        ViewMode.GRID -> {
-                            EventGridView(
+                        ViewMode.CALENDAR -> {  // ← Changed from GRID
+                            EventCalendarView(
                                 events = filteredAndSortedEvents,
                                 onEventClick = onNavigateToEventDetails,
                                 modifier = Modifier.padding(paddingValues)
@@ -384,19 +386,20 @@ fun KeepStyleTopBar(
                             }
 
                             // View mode toggle
+                            // View mode toggle (List/Calendar)
                             IconButton(
                                 onClick = {
                                     onViewModeChange(
-                                        if (viewMode == ViewMode.LIST) ViewMode.GRID else ViewMode.LIST
+                                        if (viewMode == ViewMode.LIST) ViewMode.CALENDAR else ViewMode.LIST
                                     )
                                 },
                                 modifier = Modifier.size(36.dp)
                             ) {
                                 Icon(
                                     imageVector = if (viewMode == ViewMode.LIST)
-                                        Icons.Default.GridView
+                                        Icons.Default.CalendarMonth  // ← Changed to Calendar icon
                                     else
-                                        Icons.Default.ViewAgenda,
+                                        Icons.Default.ViewAgenda,     // ← List view icon
                                     contentDescription = "Toggle view",
                                     tint = Black,
                                     modifier = Modifier.size(20.dp)
@@ -406,20 +409,19 @@ fun KeepStyleTopBar(
                     }
                 }
 
-                // Profile/Logo
+                // Notification Icon (instead of Profile)
                 Box(
                     modifier = Modifier
                         .size(36.dp)
                         .clip(CircleShape)
-                        .background(Black)
-                        .clickable { /* TODO: Profile menu */ },
+                        .clickable { /* TODO: Show notifications */ },
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = "E",
-                        color = White,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold
+                    Icon(
+                        imageVector = Icons.Default.Notifications,
+                        contentDescription = "Notifications",
+                        tint = Black,
+                        modifier = Modifier.size(22.dp)
                     )
                 }
             }
@@ -561,25 +563,70 @@ fun EventListView(
         }
     }
 }
-
 @Composable
-fun EventGridView(
+fun EventCalendarView(
     events: List<Event>,
     onEventClick: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(2),
+    // Group events by date
+    val eventsByDate = remember(events) {
+        events.groupBy { event ->
+            // Extract date from dateTime string
+            // For now, we'll use the full dateTime as the key
+            event.dateTime.substringBefore(" at").substringBefore(",")
+        }
+    }
+
+    LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
-        items(events) { event ->
-            EventCard(
-                event = event,
-                onClick = { onEventClick(event.id) }
-            )
+        eventsByDate.forEach { (date, eventsOnDate) ->
+            item {
+                // Date header
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    // Date label
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .clip(CircleShape)
+                                .background(Black)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = date,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Black
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        HorizontalDivider(
+                            modifier = Modifier.weight(1f),
+                            thickness = 2.dp,
+                            color = Black
+                        )
+                    }
+
+                    // Events on this date
+                    eventsOnDate.forEach { event ->
+                        EventCard(
+                            event = event,
+                            onClick = { onEventClick(event.id) }
+                        )
+                    }
+                }
+            }
         }
     }
 }
