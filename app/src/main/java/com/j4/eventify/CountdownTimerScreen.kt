@@ -156,25 +156,24 @@ fun CountdownTimerScreen(
                         .weight(1f)
                         .wrapContentHeight()
                 ) {
-                    // Decorative rotating circles
                     Box(
-                        modifier = Modifier.size(360.dp),  // ← Made bigger
+                        modifier = Modifier.size(400.dp),  // ← Made bigger to fit new size
                         contentAlignment = Alignment.Center
                     ) {
                         // Outer rotating ring
                         Box(
                             modifier = Modifier
-                                .size(340.dp)
+                                .size(380.dp)
                                 .rotate(rotation)
-                                .border(8.dp, textColor.copy(alpha = 0.3f), CircleShape)
+                                .border(10.dp, textColor.copy(alpha = 0.3f), CircleShape)  // ← Thicker
                         )
 
                         // Middle rotating ring (opposite direction)
                         Box(
                             modifier = Modifier
-                                .size(300.dp)
+                                .size(340.dp)
                                 .rotate(-rotation / 2)
-                                .border(6.dp, textColor.copy(alpha = 0.2f), CircleShape)
+                                .border(8.dp, textColor.copy(alpha = 0.2f), CircleShape)  // ← Thicker
                         )
 
                         // Center countdown box with pulse - NOW CONTAINS FULL COUNTDOWN
@@ -184,8 +183,8 @@ fun CountdownTimerScreen(
                             // Shadow
                             Box(
                                 modifier = Modifier
-                                    .size(260.dp)  // ← Made bigger
-                                    .offset(x = 8.dp, y = 8.dp)
+                                    .size(280.dp)  // ← Matches new size
+                                    .offset(x = 10.dp, y = 10.dp)  // ← Bigger shadow offset
                                     .clip(RoundedCornerShape(24.dp))
                                     .background(Black)
                             )
@@ -193,78 +192,88 @@ fun CountdownTimerScreen(
                             // Main countdown box
                             Column(
                                 modifier = Modifier
-                                    .size(260.dp)  // ← Made bigger
+                                    .size(280.dp)  // ← Made even bigger
                                     .clip(RoundedCornerShape(24.dp))
                                     .background(White)
-                                    .border(6.dp, Black, RoundedCornerShape(24.dp))
-                                    .padding(20.dp),
+                                    .border(8.dp, Black, RoundedCornerShape(24.dp))  // ← Thicker border
+                                    .padding(24.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 verticalArrangement = Arrangement.Center
                             ) {
                                 // Event title at top
                                 Text(
-                                    text = event.title,
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.Bold,
+                                    text = event.title.uppercase(),  // ← Uppercase for neo-brutalism
+                                    fontSize = 20.sp,  // ← Bigger
+                                    fontWeight = FontWeight.Black,  // ← Bolder
                                     color = backgroundColor,
                                     textAlign = TextAlign.Center,
                                     maxLines = 2,
-                                    modifier = Modifier.padding(bottom = 12.dp)
+                                    letterSpacing = 1.sp,  // ← Added spacing
+                                    modifier = Modifier.padding(bottom = 16.dp)
                                 )
+
+                                // Decorative line
+                                Box(
+                                    modifier = Modifier
+                                        .width(140.dp)
+                                        .height(6.dp)  // ← Thicker line
+                                        .background(backgroundColor)
+                                        .padding(bottom = 12.dp)
+                                )
+
+                                Spacer(modifier = Modifier.height(12.dp))
 
                                 // Full countdown display
                                 Column(
                                     horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    verticalArrangement = Arrangement.spacedBy(12.dp)
                                 ) {
                                     // Days and Hours Row
                                     Row(
-                                        horizontalArrangement = Arrangement.Center,
+                                        horizontalArrangement = Arrangement.spacedBy(16.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         TimeUnitCompact(
                                             value = String.format(Locale.US, "%02d", timeRemaining.days),
-                                            label = "D",
+                                            label = "DAYS",  // ← Full label
                                             color = backgroundColor
                                         )
 
                                         Text(
                                             text = ":",
-                                            fontSize = 28.sp,
+                                            fontSize = 36.sp,  // ← Bigger colon
                                             fontWeight = FontWeight.Black,
-                                            color = backgroundColor,
-                                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 0.dp)
+                                            color = backgroundColor
                                         )
 
                                         TimeUnitCompact(
                                             value = String.format(Locale.US, "%02d", timeRemaining.hours),
-                                            label = "H",
+                                            label = "HOURS",  // ← Full label
                                             color = backgroundColor
                                         )
                                     }
 
                                     // Minutes and Seconds Row
                                     Row(
-                                        horizontalArrangement = Arrangement.Center,
+                                        horizontalArrangement = Arrangement.spacedBy(16.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         TimeUnitCompact(
                                             value = String.format(Locale.US, "%02d", timeRemaining.minutes),
-                                            label = "M",
+                                            label = "MINS",  // ← Full label
                                             color = backgroundColor
                                         )
 
                                         Text(
                                             text = ":",
-                                            fontSize = 28.sp,
+                                            fontSize = 36.sp,  // ← Bigger colon
                                             fontWeight = FontWeight.Black,
-                                            color = backgroundColor,
-                                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 0.dp)
+                                            color = backgroundColor
                                         )
 
                                         TimeUnitCompact(
                                             value = String.format(Locale.US, "%02d", timeRemaining.seconds),
-                                            label = "S",
+                                            label = "SECS",  // ← Full label
                                             color = backgroundColor
                                         )
                                     }
@@ -378,21 +387,21 @@ fun TimeUnitCompact(
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(2.dp)
+        verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         Text(
             text = value,
-            fontSize = 32.sp,
+            fontSize = 40.sp,  // ← Much bigger!
             fontWeight = FontWeight.Black,
             color = color,
-            lineHeight = 32.sp
+            lineHeight = 40.sp
         )
         Text(
             text = label,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Bold,
-            color = color.copy(alpha = 0.7f),
-            letterSpacing = 0.5.sp
+            fontSize = 11.sp,  // ← Slightly bigger
+            fontWeight = FontWeight.Black,  // ← Bolder
+            color = color,
+            letterSpacing = 1.sp  // ← Added spacing
         )
     }
 }
