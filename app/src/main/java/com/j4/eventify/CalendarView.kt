@@ -338,9 +338,9 @@ fun DayCell(
                     .clip(CircleShape)
                     .background(
                         when {
-                            isToday && isSelected -> White
-                            isToday -> Black
-                            else -> Color.Transparent
+                            isSelected -> White          // ← Selected: White circle
+                            isToday -> Black             // ← Today: Black circle
+                            else -> Color.Transparent    // ← Normal: No circle
                         }
                     ),
                 contentAlignment = Alignment.Center
@@ -350,9 +350,9 @@ fun DayCell(
                     fontSize = 13.sp,
                     fontWeight = if (isToday || isSelected) FontWeight.Black else FontWeight.Normal,
                     color = when {
-                        isSelected -> White
-                        isToday -> White
-                        else -> Black
+                        isSelected -> Black          // ← Selected: Black text on white circle
+                        isToday -> White             // ← Today: White text on black circle ✅ FIXED
+                        else -> Black                // ← Normal: Black text
                     }
                 )
             }
@@ -393,7 +393,6 @@ fun DayCell(
         }
     }
 }
-
 @Composable
 fun SelectedDayEvents(
     selectedDay: Int,
