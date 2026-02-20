@@ -1,35 +1,49 @@
 package com.j4.eventify
 
+
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
-import androidx.compose.material3.Text
+import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.j4.eventify.ui.theme.FABRed
-import com.j4.eventify.ui.theme.White
+import com.j4.eventify.ui.theme.*
 
 /**
  * Shared UI components used across multiple screens
  */
 
 @Composable
-fun EventifyFAB(onClick: () -> Unit = {}) {
+fun EventifyFAB(
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit = {}
+) {
     FloatingActionButton(
         onClick = onClick,
-        containerColor = FABRed,
-        contentColor = White,
-        elevation = FloatingActionButtonDefaults.elevation(0.dp),
-        modifier = Modifier.clip(RoundedCornerShape(16.dp))
+        modifier = modifier
+            .padding(bottom = 16.dp, end = 16.dp)
+            .size(64.dp)
+            .border(5.dp, Black, RoundedCornerShape(16.dp)),  // ← Bold border directly on FAB
+        containerColor = White,
+        contentColor = Black,
+        shape = RoundedCornerShape(16.dp),
+        elevation = FloatingActionButtonDefaults.elevation(
+            defaultElevation = 0.dp,
+            pressedElevation = 0.dp,
+            focusedElevation = 0.dp,
+            hoveredElevation = 0.dp
+        )
     ) {
-        Text(
-            text = "+",
-            fontSize = 32.sp,
-            fontWeight = FontWeight.Bold
+        Icon(
+            imageVector = Icons.Default.Add,
+            contentDescription = "Add Event",
+            modifier = Modifier.size(36.dp),
+            tint = Black
         )
     }
 }
