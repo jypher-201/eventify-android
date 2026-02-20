@@ -451,7 +451,7 @@ fun DrawerContent(
                 modifier = Modifier.padding(vertical = 16.dp)
             )
 
-            HorizontalDivider(color = Color(0xFFE0E0E0))  // ✅ Fixed
+            HorizontalDivider(color = Color(0xFFE0E0E0))
 
             Spacer(modifier = Modifier.height(8.dp))
 
@@ -489,21 +489,14 @@ fun DrawerContent(
 
             Spacer(modifier = Modifier.weight(1f))
 
-            HorizontalDivider(color = Color(0xFFE0E0E0))  // ✅ Fixed
+            HorizontalDivider(color = Color(0xFFE0E0E0))
 
-            // Settings
-            DrawerItem(
-                icon = Icons.Default.Settings,
-                text = "Settings",
-                selected = false,
-                onClick = { /* TODO */ }
-            )
-
+            // About (Settings removed - will become theme toggle later)
             DrawerItem(
                 icon = Icons.Default.Info,
                 text = "About",
                 selected = false,
-                onClick = { /* TODO */ }
+                onClick = { /* TODO: Show about dialog/screen */ }
             )
         }
     }
