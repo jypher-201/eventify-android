@@ -327,58 +327,66 @@ fun KeepStyleTopBar(
                             // Sort button
                             Box {
                                 IconButton(
-                                    onClick = { onShowSortMenuChange(true) },
-                                    modifier = Modifier.size(36.dp)
+                                    onClick = {
+                                        if (viewMode == ViewMode.LIST) {  // ← Only works in LIST view
+                                            onShowSortMenuChange(true)
+                                        }
+                                    },
+                                    modifier = Modifier.size(36.dp),
+                                    enabled = viewMode == ViewMode.LIST  // ← Disabled in CALENDAR view
                                 ) {
                                     Icon(
                                         imageVector = Icons.AutoMirrored.Filled.Sort,
                                         contentDescription = "Sort",
-                                        tint = Black,
+                                        tint = if (viewMode == ViewMode.LIST) Black else Color.Gray,  // ← Gray when disabled
                                         modifier = Modifier.size(20.dp)
                                     )
                                 }
 
-                                DropdownMenu(
-                                    expanded = showSortMenu,
-                                    onDismissRequest = { onShowSortMenuChange(false) },
-                                    modifier = Modifier.background(White)
-                                ) {
-                                    DropdownMenuItem(
-                                        text = {
-                                            Text(
-                                                "Sort by Date",
-                                                fontWeight = if (sortOption == SortOption.DATE) FontWeight.Bold else FontWeight.Normal
-                                            )
-                                        },
-                                        onClick = {
-                                            onSortOptionChange(SortOption.DATE)
-                                            onShowSortMenuChange(false)
-                                        }
-                                    )
-                                    DropdownMenuItem(
-                                        text = {
-                                            Text(
-                                                "Sort by Type",
-                                                fontWeight = if (sortOption == SortOption.TYPE) FontWeight.Bold else FontWeight.Normal
-                                            )
-                                        },
-                                        onClick = {
-                                            onSortOptionChange(SortOption.TYPE)
-                                            onShowSortMenuChange(false)
-                                        }
-                                    )
-                                    DropdownMenuItem(
-                                        text = {
-                                            Text(
-                                                "Sort by Name",
-                                                fontWeight = if (sortOption == SortOption.NAME) FontWeight.Bold else FontWeight.Normal
-                                            )
-                                        },
-                                        onClick = {
-                                            onSortOptionChange(SortOption.NAME)
-                                            onShowSortMenuChange(false)
-                                        }
-                                    )
+                                // Dropdown menu - only show in LIST view
+                                if (viewMode == ViewMode.LIST) {
+                                    DropdownMenu(
+                                        expanded = showSortMenu,
+                                        onDismissRequest = { onShowSortMenuChange(false) },
+                                        modifier = Modifier.background(White)
+                                    ) {
+                                        DropdownMenuItem(
+                                            text = {
+                                                Text(
+                                                    "Sort by Date",
+                                                    fontWeight = if (sortOption == SortOption.DATE) FontWeight.Bold else FontWeight.Normal
+                                                )
+                                            },
+                                            onClick = {
+                                                onSortOptionChange(SortOption.DATE)
+                                                onShowSortMenuChange(false)
+                                            }
+                                        )
+                                        DropdownMenuItem(
+                                            text = {
+                                                Text(
+                                                    "Sort by Type",
+                                                    fontWeight = if (sortOption == SortOption.TYPE) FontWeight.Bold else FontWeight.Normal
+                                                )
+                                            },
+                                            onClick = {
+                                                onSortOptionChange(SortOption.TYPE)
+                                                onShowSortMenuChange(false)
+                                            }
+                                        )
+                                        DropdownMenuItem(
+                                            text = {
+                                                Text(
+                                                    "Sort by Name",
+                                                    fontWeight = if (sortOption == SortOption.NAME) FontWeight.Bold else FontWeight.Normal
+                                                )
+                                            },
+                                            onClick = {
+                                                onSortOptionChange(SortOption.NAME)
+                                                onShowSortMenuChange(false)
+                                            }
+                                        )
+                                    }
                                 }
                             }
 
