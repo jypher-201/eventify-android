@@ -100,7 +100,7 @@ fun EventCard(
             Box(
                 modifier = Modifier
                     .border(4.dp, Black, RoundedCornerShape(12.dp))
-                    .padding(16.dp)  // ← Changed from 20.dp to 16.dp
+                    .padding(12.dp)  // ← Changed from 16dp to 12dp (25% reduction)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -109,27 +109,27 @@ fun EventCard(
                 ) {
                     Column(
                         modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)  // ← Changed from 8.dp to 6.dp
+                        verticalArrangement = Arrangement.spacedBy(4.dp)  // ← Changed from 6dp to 4dp
                     ) {
                         Text(
                             text = event.title,
-                            fontSize = 18.sp,  // ← Changed from 22.sp to 18.sp
+                            fontSize = 16.sp,  // ← Changed from 18sp to 16sp
                             fontWeight = FontWeight.Bold,
                             color = textColor,
-                            lineHeight = 22.sp  // ← Changed from 26.sp to 22.sp
+                            lineHeight = 20.sp  // ← Changed from 22sp to 20sp
                         )
 
                         Box(
                             modifier = Modifier
-                                .fillMaxWidth(0.5f)  // ← Changed from 0.6f to 0.5f (shorter underline)
-                                .padding(top = 2.dp)  // ← Changed from 4.dp to 2.dp
+                                .fillMaxWidth(0.45f)  // ← Changed from 0.5f to 0.45f
+                                .padding(top = 1.dp)  // ← Changed from 2dp to 1dp
                                 .background(textColor)
-                                .padding(vertical = 1.dp)  // ← Changed from 1.5.dp to 1.dp
+                                .padding(vertical = 0.8.dp)  // ← Changed from 1dp to 0.8dp
                         )
 
                         Text(
                             text = event.dateTime,
-                            fontSize = 12.sp,  // ← Changed from 14.sp to 12.sp
+                            fontSize = 11.sp,  // ← Changed from 12sp to 11sp
                             fontWeight = FontWeight.Bold,
                             color = textColor.copy(alpha = 0.8f)
                         )
@@ -138,11 +138,11 @@ fun EventCard(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(4.dp))
                                 .background(badgeColor)
-                                .padding(horizontal = 10.dp, vertical = 4.dp)  // ← Changed from 12.dp, 6.dp to 10.dp, 4.dp
+                                .padding(horizontal = 8.dp, vertical = 3.dp)  // ← Changed from 10dp, 4dp
                         ) {
                             Text(
                                 text = event.type.name,
-                                fontSize = 11.sp,  // ← Changed from 12.sp to 11.sp
+                                fontSize = 10.sp,  // ← Changed from 11sp to 10sp
                                 fontWeight = FontWeight.Bold,
                                 color = Black
                             )
@@ -155,15 +155,15 @@ fun EventCard(
                     ) {
                         Text(
                             text = event.countdownNumber,
-                            fontSize = 42.sp,  // ← Changed from 56.sp to 42.sp
-                            fontWeight = FontWeight.Bold,
+                            fontSize = 32.sp,  // ← Changed from 42sp to 32sp (24% reduction)
+                            fontWeight = FontWeight.Black,
                             color = textColor,
-                            lineHeight = 42.sp  // ← Changed from 56.sp to 42.sp
+                            lineHeight = 32.sp  // ← Changed from 42sp to 32sp
                         )
 
                         Text(
                             text = event.countdownLabel,
-                            fontSize = 12.sp,  // ← Changed from 14.sp to 12.sp
+                            fontSize = 11.sp,  // ← Changed from 12sp to 11sp
                             fontWeight = FontWeight.Bold,
                             color = textColor,
                             letterSpacing = 0.5.sp

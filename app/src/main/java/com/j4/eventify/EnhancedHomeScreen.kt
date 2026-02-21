@@ -138,10 +138,16 @@ fun EnhancedHomeScreen(
                         searchQuery = searchQuery,
                         onSearchQueryChange = { searchQuery = it },
                         viewMode = viewMode,
-                        onViewModeChange = { viewMode = it },
-                        timeFilter = timeFilter,                      // ← Changed
-                        onTimeFilterChange = { timeFilter = it },     // ← Changed
-                        showTimeFilterMenu = showTimeFilterMenu,      // ← Changed
+                        onViewModeChange = { newMode ->
+                            viewMode = newMode
+                            // Auto-clear event type filter when switching to CALENDAR
+                            if (newMode == ViewMode.CALENDAR && selectedFilter != null) {
+                                selectedFilter = null
+                            }
+                        },
+                        timeFilter = timeFilter,
+                        onTimeFilterChange = { timeFilter = it },
+                        showTimeFilterMenu = showTimeFilterMenu,
                         onShowTimeFilterMenuChange = { showTimeFilterMenu = it },
                         onMenuClick = {
                             scope.launch { drawerState.open() }
