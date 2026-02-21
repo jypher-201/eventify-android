@@ -11,7 +11,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward  // ← Fixed
-import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -71,7 +70,7 @@ fun CalendarView(
     var currentYear by remember { mutableIntStateOf(todayYear) }     // ← mutableIntStateOf
     var selectedDay by remember { mutableIntStateOf(todayDay) }      // ← mutableIntStateOf
 
-    val calendarEvents = remember { mapEventsToDays() }
+    val calendarEvents = remember(events) { mapEventsToDays() }
 
     // Get events for selected day
     val selectedDayEvents = calendarEvents.filter {

@@ -34,6 +34,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.animation.Crossfade
 
 enum class ViewMode {
     LIST,
@@ -155,20 +156,26 @@ fun EnhancedHomeScreen(
                             "No events found"
                     )
                 } else {
-                    when (viewMode) {
-                        ViewMode.LIST -> {
-                            EventListView(
-                                events = filteredAndSortedEvents,
-                                onEventClick = onNavigateToEventDetails,
-                                modifier = Modifier.padding(paddingValues)
-                            )
-                        }
-                        ViewMode.CALENDAR -> {
-                            CalendarView(  // ← Updated to use new CalendarView
-                                events = filteredAndSortedEvents,
-                                onEventClick = onNavigateToEventDetails,
-                                modifier = Modifier.padding(paddingValues)
-                            )
+                    Crossfade(
+                        targetState = viewMode,
+                        modifier = Modifier.padding(paddingValues),
+                        label = "view_mode_transition"
+                    ) { mode ->
+                        when (mode) {
+                            ViewMode.LIST -> {
+                                EventListView(
+                                    events = filteredAndSortedEvents,
+                                    onEventClick = onNavigateToEventDetails,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
+                            ViewMode.CALENDAR -> {
+                                CalendarView(
+                                    events = filteredAndSortedEvents,
+                                    onEventClick = onNavigateToEventDetails,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
                         }
                     }
                 }
@@ -518,14 +525,7 @@ fun DrawerContent(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Filter options
-            DrawerItem(
-                icon = Icons.Default.CalendarToday,
-                text = "All Events",
-                selected = selectedFilter == null,
-                onClick = { onFilterSelected(null) }
-            )
-
+            // Event Type Filters (removed "All Events")
             DrawerItem(
                 icon = Icons.Default.School,
                 text = "Academic",
@@ -554,7 +554,7 @@ fun DrawerContent(
 
             HorizontalDivider(color = Color(0xFFE0E0E0))
 
-            // About (Settings removed - will become theme toggle later)
+            // About
             DrawerItem(
                 icon = Icons.Default.Info,
                 text = "About",
