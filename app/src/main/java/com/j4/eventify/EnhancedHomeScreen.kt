@@ -120,8 +120,13 @@ fun EnhancedHomeScreen(
         drawerContent = {
             DrawerContent(
                 selectedFilter = selectedFilter,
+                currentViewMode = viewMode,  // ← Pass current view mode
                 onFilterSelected = { filter ->
                     selectedFilter = filter
+                    // Auto-switch to LIST view when filtering by event type
+                    if (filter != null && viewMode == ViewMode.CALENDAR) {
+                        viewMode = ViewMode.LIST
+                    }
                     scope.launch { drawerState.close() }
                 }
             )
@@ -500,6 +505,7 @@ fun KeepStyleTopBar(
 @Composable
 fun DrawerContent(
     selectedFilter: EventType?,
+    currentViewMode: ViewMode,
     onFilterSelected: (EventType?) -> Unit
 ) {
     ModalDrawerSheet(
@@ -525,7 +531,28 @@ fun DrawerContent(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Event Type Filters (removed "All Events")
+            // Show hint if in calendar view
+            if (currentViewMode == ViewMode.CALENDAR) {
+                Text(
+                    text = "Filtering will switch to list view",
+                    fontSize = 12.sp,
+                    color = Color.Gray,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                )
+            }
+
+            // ALL EVENT TYPES - Clear filter option
+            DrawerItem(
+                icon = Icons.Default.GridView,  // or Icons.Default.Apps
+                text = "All Event Types",
+                selected = selectedFilter == null,
+                color = Black,
+                onClick = { onFilterSelected(null) }
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Individual Event Type Filters
             DrawerItem(
                 icon = Icons.Default.School,
                 text = "Academic",
@@ -564,7 +591,6 @@ fun DrawerContent(
         }
     }
 }
-
 @Composable
 fun DrawerItem(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
