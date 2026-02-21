@@ -442,7 +442,7 @@ fun KeepStyleTopBar(
                                     }
                                 }
                             }
-                            // View mode toggle
+
                             // View mode toggle (List/Calendar)
                             IconButton(
                                 onClick = {
@@ -453,11 +453,14 @@ fun KeepStyleTopBar(
                                 modifier = Modifier.size(36.dp)
                             ) {
                                 Icon(
-                                    imageVector = if (viewMode == ViewMode.LIST)
-                                        Icons.Default.CalendarMonth  // ← Changed to Calendar icon
+                                    imageVector = if (viewMode == ViewMode.CALENDAR)  // ← REVERSED
+                                        Icons.Default.CalendarMonth      // In CALENDAR view, show Calendar icon
                                     else
-                                        Icons.Default.ViewAgenda,     // ← List view icon
-                                    contentDescription = "Toggle view",
+                                        Icons.Default.ViewAgenda,        // In LIST view, show List icon
+                                    contentDescription = if (viewMode == ViewMode.LIST)
+                                        "Switch to Calendar view"
+                                    else
+                                        "Switch to List view",
                                     tint = Black,
                                     modifier = Modifier.size(20.dp)
                                 )
