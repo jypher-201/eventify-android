@@ -8,7 +8,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -65,9 +65,6 @@ fun EnhancedHomeScreen(
 
 
     val filteredAndSortedEvents = remember(selectedFilter, searchQuery, timeFilter) {
-        // Remove these two lines ↓
-        // val philippinesZone = java.util.TimeZone.getTimeZone("Asia/Manila")
-        // val today = java.util.Calendar.getInstance(philippinesZone)
 
         val filtered = if (selectedFilter != null) {
             DummyData.events.filter { it.type == selectedFilter }
@@ -368,7 +365,7 @@ fun KeepStyleTopBar(
                                     enabled = viewMode == ViewMode.LIST
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Default.FilterList,  // ← Changed icon
+                                        imageVector = Icons.Default.AccessTime,
                                         contentDescription = "Filter by time",
                                         tint = if (viewMode == ViewMode.LIST) Black else Color.Gray,
                                         modifier = Modifier.size(20.dp)
