@@ -8,7 +8,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Sort
+import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -40,10 +40,12 @@ enum class ViewMode {
     CALENDAR
 }
 
-enum class SortOption {
-    DATE,
-    TYPE,
-    NAME
+enum class TimeFilter {
+    ALL,
+    TODAY,
+    TOMORROW,
+    THIS_WEEK,
+    THIS_MONTH
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -58,11 +60,15 @@ fun EnhancedHomeScreen(
     var selectedFilter by remember { mutableStateOf<EventType?>(null) }
     var searchQuery by remember { mutableStateOf("") }
     var viewMode by remember { mutableStateOf(ViewMode.LIST) }
-    var sortOption by remember { mutableStateOf(SortOption.DATE) }
-    var showSortMenu by remember { mutableStateOf(false) }
+    var timeFilter by remember { mutableStateOf(TimeFilter.ALL) }
+    var showTimeFilterMenu by remember { mutableStateOf(false) }
 
 
-    val filteredAndSortedEvents = remember(selectedFilter, searchQuery, sortOption) {
+    val filteredAndSortedEvents = remember(selectedFilter, searchQuery, timeFilter) {
+        // Remove these two lines ↓
+        // val philippinesZone = java.util.TimeZone.getTimeZone("Asia/Manila")
+        // val today = java.util.Calendar.getInstance(philippinesZone)
+
         val filtered = if (selectedFilter != null) {
             DummyData.events.filter { it.type == selectedFilter }
         } else {
@@ -78,11 +84,37 @@ fun EnhancedHomeScreen(
             filtered
         }
 
-        when (sortOption) {
-            SortOption.DATE -> searched.sortedBy { it.dateTime }
-            SortOption.TYPE -> searched.sortedBy { it.type.name }
-            SortOption.NAME -> searched.sortedBy { it.title }
+        // Time filtering
+        val timeFiltered = when (timeFilter) {
+            TimeFilter.ALL -> searched
+            TimeFilter.TODAY -> {
+                searched.filter { event ->
+                    val daysFromNow = event.countdownNumber.toIntOrNull() ?: 999
+                    daysFromNow == 0
+                }
+            }
+            TimeFilter.TOMORROW -> {
+                searched.filter { event ->
+                    val daysFromNow = event.countdownNumber.toIntOrNull() ?: 999
+                    daysFromNow == 1
+                }
+            }
+            TimeFilter.THIS_WEEK -> {
+                searched.filter { event ->
+                    val daysFromNow = event.countdownNumber.toIntOrNull() ?: 999
+                    daysFromNow in 0..7
+                }
+            }
+            TimeFilter.THIS_MONTH -> {
+                searched.filter { event ->
+                    val daysFromNow = event.countdownNumber.toIntOrNull() ?: 999
+                    daysFromNow in 0..30
+                }
+            }
         }
+
+        // Always sort by date (soonest first)
+        timeFiltered.sortedBy { it.countdownNumber.toIntOrNull() ?: 999 }
     }
 
     ModalNavigationDrawer(
@@ -104,10 +136,10 @@ fun EnhancedHomeScreen(
                         onSearchQueryChange = { searchQuery = it },
                         viewMode = viewMode,
                         onViewModeChange = { viewMode = it },
-                        sortOption = sortOption,
-                        onSortOptionChange = { sortOption = it },
-                        showSortMenu = showSortMenu,
-                        onShowSortMenuChange = { showSortMenu = it },
+                        timeFilter = timeFilter,                      // ← Changed
+                        onTimeFilterChange = { timeFilter = it },     // ← Changed
+                        showTimeFilterMenu = showTimeFilterMenu,      // ← Changed
+                        onShowTimeFilterMenuChange = { showTimeFilterMenu = it },
                         onMenuClick = {
                             scope.launch { drawerState.open() }
                         }
@@ -155,10 +187,10 @@ fun KeepStyleTopBar(
     onSearchQueryChange: (String) -> Unit,
     viewMode: ViewMode,
     onViewModeChange: (ViewMode) -> Unit,
-    sortOption: SortOption,
-    onSortOptionChange: (SortOption) -> Unit,
-    showSortMenu: Boolean,
-    onShowSortMenuChange: (Boolean) -> Unit,
+    timeFilter: TimeFilter,
+    onTimeFilterChange: (TimeFilter) -> Unit,
+    showTimeFilterMenu: Boolean,
+    onShowTimeFilterMenuChange: (Boolean) -> Unit,
     onMenuClick: () -> Unit
 ) {
     var isSearchExpanded by remember { mutableStateOf(false) }
@@ -324,72 +356,95 @@ fun KeepStyleTopBar(
                             horizontalArrangement = Arrangement.spacedBy(0.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Sort button
+                            // Time Filter button
                             Box {
                                 IconButton(
                                     onClick = {
-                                        if (viewMode == ViewMode.LIST) {  // ← Only works in LIST view
-                                            onShowSortMenuChange(true)
+                                        if (viewMode == ViewMode.LIST) {
+                                            onShowTimeFilterMenuChange(true)
                                         }
                                     },
                                     modifier = Modifier.size(36.dp),
-                                    enabled = viewMode == ViewMode.LIST  // ← Disabled in CALENDAR view
+                                    enabled = viewMode == ViewMode.LIST
                                 ) {
                                     Icon(
-                                        imageVector = Icons.AutoMirrored.Filled.Sort,
-                                        contentDescription = "Sort",
-                                        tint = if (viewMode == ViewMode.LIST) Black else Color.Gray,  // ← Gray when disabled
+                                        imageVector = Icons.Default.FilterList,  // ← Changed icon
+                                        contentDescription = "Filter by time",
+                                        tint = if (viewMode == ViewMode.LIST) Black else Color.Gray,
                                         modifier = Modifier.size(20.dp)
                                     )
                                 }
 
-                                // Dropdown menu - only show in LIST view
+                                // Time filter dropdown menu - only show in LIST view
                                 if (viewMode == ViewMode.LIST) {
                                     DropdownMenu(
-                                        expanded = showSortMenu,
-                                        onDismissRequest = { onShowSortMenuChange(false) },
+                                        expanded = showTimeFilterMenu,
+                                        onDismissRequest = { onShowTimeFilterMenuChange(false) },
                                         modifier = Modifier.background(White)
                                     ) {
                                         DropdownMenuItem(
                                             text = {
                                                 Text(
-                                                    "Sort by Date",
-                                                    fontWeight = if (sortOption == SortOption.DATE) FontWeight.Bold else FontWeight.Normal
+                                                    "All Events",
+                                                    fontWeight = if (timeFilter == TimeFilter.ALL) FontWeight.Bold else FontWeight.Normal
                                                 )
                                             },
                                             onClick = {
-                                                onSortOptionChange(SortOption.DATE)
-                                                onShowSortMenuChange(false)
+                                                onTimeFilterChange(TimeFilter.ALL)
+                                                onShowTimeFilterMenuChange(false)
                                             }
                                         )
                                         DropdownMenuItem(
                                             text = {
                                                 Text(
-                                                    "Sort by Type",
-                                                    fontWeight = if (sortOption == SortOption.TYPE) FontWeight.Bold else FontWeight.Normal
+                                                    "Today",
+                                                    fontWeight = if (timeFilter == TimeFilter.TODAY) FontWeight.Bold else FontWeight.Normal
                                                 )
                                             },
                                             onClick = {
-                                                onSortOptionChange(SortOption.TYPE)
-                                                onShowSortMenuChange(false)
+                                                onTimeFilterChange(TimeFilter.TODAY)
+                                                onShowTimeFilterMenuChange(false)
                                             }
                                         )
                                         DropdownMenuItem(
                                             text = {
                                                 Text(
-                                                    "Sort by Name",
-                                                    fontWeight = if (sortOption == SortOption.NAME) FontWeight.Bold else FontWeight.Normal
+                                                    "Tomorrow",
+                                                    fontWeight = if (timeFilter == TimeFilter.TOMORROW) FontWeight.Bold else FontWeight.Normal
                                                 )
                                             },
                                             onClick = {
-                                                onSortOptionChange(SortOption.NAME)
-                                                onShowSortMenuChange(false)
+                                                onTimeFilterChange(TimeFilter.TOMORROW)
+                                                onShowTimeFilterMenuChange(false)
+                                            }
+                                        )
+                                        DropdownMenuItem(
+                                            text = {
+                                                Text(
+                                                    "This Week",
+                                                    fontWeight = if (timeFilter == TimeFilter.THIS_WEEK) FontWeight.Bold else FontWeight.Normal
+                                                )
+                                            },
+                                            onClick = {
+                                                onTimeFilterChange(TimeFilter.THIS_WEEK)
+                                                onShowTimeFilterMenuChange(false)
+                                            }
+                                        )
+                                        DropdownMenuItem(
+                                            text = {
+                                                Text(
+                                                    "This Month",
+                                                    fontWeight = if (timeFilter == TimeFilter.THIS_MONTH) FontWeight.Bold else FontWeight.Normal
+                                                )
+                                            },
+                                            onClick = {
+                                                onTimeFilterChange(TimeFilter.THIS_MONTH)
+                                                onShowTimeFilterMenuChange(false)
                                             }
                                         )
                                     }
                                 }
                             }
-
                             // View mode toggle
                             // View mode toggle (List/Calendar)
                             IconButton(
