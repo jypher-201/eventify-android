@@ -32,16 +32,17 @@ import androidx.compose.foundation.layout.statusBarsPadding
 @Composable
 fun AddEventScreen(
     onNavigateBack: () -> Unit = {},
-    onSaveEvent: (String, EventType, String, String, String) -> Unit = { _, _, _, _, _ -> }
+    onSaveEvent: (String, EventType, String, String, String) -> Unit = { _, _, _, _, _ -> },
+    prefilledDate: String? = null  // ← ADD THIS
 ) {
     var title by remember { mutableStateOf("") }
     var selectedType by remember { mutableStateOf(EventType.ACADEMIC) }
     var showTypeDialog by remember { mutableStateOf(false) }
 
     var isAllDay by remember { mutableStateOf(false) }
-    var startDate by remember { mutableStateOf("Feb 25, 2024") }
+    var startDate by remember { mutableStateOf(prefilledDate ?: "Feb 25, 2024") }  // ← USE prefilledDate
     var startTime by remember { mutableStateOf("10:00 AM") }
-    var endDate by remember { mutableStateOf("Feb 25, 2024") }
+    var endDate by remember { mutableStateOf(prefilledDate ?: "Feb 25, 2024") }    // ← USE prefilledDate
     var endTime by remember { mutableStateOf("11:00 AM") }
 
     var location by remember { mutableStateOf("") }

@@ -52,7 +52,7 @@ enum class TimeFilter {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EnhancedHomeScreen(
-    onNavigateToAddEvent: () -> Unit = {},
+    onNavigateToAddEvent: (String?) -> Unit = { _ -> },  // ← Accept date parameter
     onNavigateToEventDetails: (Int) -> Unit = {}
 ) {
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
@@ -63,6 +63,7 @@ fun EnhancedHomeScreen(
     var viewMode by remember { mutableStateOf(ViewMode.LIST) }
     var timeFilter by remember { mutableStateOf(TimeFilter.ALL) }
     var showTimeFilterMenu by remember { mutableStateOf(false) }
+    var selectedCalendarDate by remember { mutableStateOf<String?>(null) }
 
 
     val filteredAndSortedEvents = remember(selectedFilter, searchQuery, timeFilter) {
@@ -155,7 +156,17 @@ fun EnhancedHomeScreen(
                     )
                 },
                 floatingActionButton = {
-                    EventifyFAB(onClick = onNavigateToAddEvent)
+                    EventifyFAB(
+                        onClick = {
+                            // Pass selected date only if in calendar view
+                            val dateToPass = if (viewMode == ViewMode.CALENDAR) {
+                                selectedCalendarDate
+                            } else {
+                                null
+                            }
+                            onNavigateToAddEvent(dateToPass)  // ← Pass the date
+                        }
+                    )
                 }
             ) { paddingValues ->
                 if (filteredAndSortedEvents.isEmpty()) {
@@ -184,6 +195,9 @@ fun EnhancedHomeScreen(
                                 CalendarView(
                                     events = filteredAndSortedEvents,
                                     onEventClick = onNavigateToEventDetails,
+                                    onDateSelected = { date ->  // ← ADD THIS
+                                        selectedCalendarDate = date
+                                    },
                                     modifier = Modifier.fillMaxSize()
                                 )
                             }

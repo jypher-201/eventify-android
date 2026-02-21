@@ -30,27 +30,45 @@ fun EventifyNavigation() {
         startDestination = Routes.HOME
     ) {
         // Home Screen
-        composable(Routes.HOME) {
+        composable(route = Routes.HOME) {
             EnhancedHomeScreen(
-                onNavigateToAddEvent = {
+                onNavigateToAddEvent = { selectedDate ->
+                    // Save selected date to navigation state
+                    if (selectedDate != null) {
+                        navController.currentBackStackEntry
+                            ?.savedStateHandle
+                            ?.set("selectedDate", selectedDate)
+                    }
                     navController.navigate(Routes.ADD_EVENT)
                 },
                 onNavigateToEventDetails = { eventId ->
-                    navController.navigate(Routes.eventDetails(eventId))
+                    navController.navigate("${Routes.EVENT_DETAILS}/$eventId")
                 }
             )
         }
 
         // Add Event Screen
-        composable(Routes.ADD_EVENT) {
+        composable(route = Routes.ADD_EVENT) {
+            val selectedDate = navController.previousBackStackEntry
+                ?.savedStateHandle
+                ?.get<String>("selectedDate")
+
             AddEventScreen(
                 onNavigateBack = {
+                    // Clear the saved date
+                    navController.previousBackStackEntry
+                        ?.savedStateHandle
+                        ?.remove<String>("selectedDate")
                     navController.popBackStack()
                 },
-                onSaveEvent = { title, type, date, time, notes ->
-                    // TODO: In Phase 2, save to database
-                    // For now, just navigate back
-                }
+                onSaveEvent = { title, type, startDate, startTime, notes ->
+                    // TODO: Save to database
+                    navController.previousBackStackEntry
+                        ?.savedStateHandle
+                        ?.remove<String>("selectedDate")
+                    navController.popBackStack()
+                },
+                prefilledDate = selectedDate  // ← Pass to AddEventScreen
             )
         }
 

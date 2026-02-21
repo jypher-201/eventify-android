@@ -57,18 +57,19 @@ fun mapEventsToDays(): List<CalendarEvent> {
 fun CalendarView(
     events: List<Event>,
     onEventClick: (Int) -> Unit,
+    onDateSelected: (String) -> Unit = {},  // ← NEW parameter
     modifier: Modifier = Modifier
 ) {
     val philippinesZone = java.util.TimeZone.getTimeZone("Asia/Manila")
     val today = Calendar.getInstance(philippinesZone)
 
-    val todayDay = today.get(Calendar.DAY_OF_MONTH)      // ← Store values directly
+    val todayDay = today.get(Calendar.DAY_OF_MONTH)
     val todayMonth = today.get(Calendar.MONTH)
     val todayYear = today.get(Calendar.YEAR)
 
-    var currentMonth by remember { mutableIntStateOf(todayMonth) }   // ← mutableIntStateOf
-    var currentYear by remember { mutableIntStateOf(todayYear) }     // ← mutableIntStateOf
-    var selectedDay by remember { mutableIntStateOf(todayDay) }      // ← mutableIntStateOf
+    var currentMonth by remember { mutableIntStateOf(todayMonth) }
+    var currentYear by remember { mutableIntStateOf(todayYear) }
+    var selectedDay by remember { mutableIntStateOf(todayDay) }
 
     val calendarEvents = remember(events) { mapEventsToDays() }
 
@@ -78,6 +79,16 @@ fun CalendarView(
                 it.month == currentMonth &&
                 it.year == currentYear
     }.map { it.event }
+
+    // Format and send selected date when day changes
+    LaunchedEffect(selectedDay, currentMonth, currentYear) {
+        val monthNames = listOf(
+            "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+            "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+        )
+        val formattedDate = "${monthNames[currentMonth]} $selectedDay, $currentYear"
+        onDateSelected(formattedDate)
+    }
 
     Column(
         modifier = modifier
