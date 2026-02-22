@@ -13,7 +13,7 @@ import androidx.navigation.navArgument
 object Routes {
     const val HOME = "home"
     const val ADD_EVENT = "add_event"
-    const val EVENT_DETAILS = "event_details/{eventId}"
+    const val EVENT_DETAILS = "event_details"  // ← FIXED: Removed /{eventId}
 
     fun eventDetails(eventId: Int) = "event_details/$eventId"
 }
@@ -33,7 +33,6 @@ fun EventifyNavigation() {
         composable(route = Routes.HOME) {
             EnhancedHomeScreen(
                 onNavigateToAddEvent = { selectedDate ->
-                    // Save selected date to navigation state
                     if (selectedDate != null) {
                         navController.currentBackStackEntry
                             ?.savedStateHandle
@@ -42,7 +41,7 @@ fun EventifyNavigation() {
                     navController.navigate(Routes.ADD_EVENT)
                 },
                 onNavigateToEventDetails = { eventId ->
-                    navController.navigate("${Routes.EVENT_DETAILS}/$eventId")
+                    navController.navigate(Routes.eventDetails(eventId))  // ← FIXED: Use helper
                 }
             )
         }
@@ -55,7 +54,6 @@ fun EventifyNavigation() {
 
             AddEventScreen(
                 onNavigateBack = {
-                    // Clear the saved date
                     navController.previousBackStackEntry
                         ?.savedStateHandle
                         ?.remove<String>("selectedDate")
@@ -68,13 +66,13 @@ fun EventifyNavigation() {
                         ?.remove<String>("selectedDate")
                     navController.popBackStack()
                 },
-                prefilledDate = selectedDate  // ← Pass to AddEventScreen
+                prefilledDate = selectedDate
             )
         }
 
-        // Event Details Screen - NOW SHOWS COUNTDOWN TIMER
+        // Event Details Screen
         composable(
-            route = Routes.EVENT_DETAILS,
+            route = "${Routes.EVENT_DETAILS}/{eventId}",  // ← FIXED: Properly combined
             arguments = listOf(
                 navArgument("eventId") {
                     type = NavType.IntType
@@ -82,23 +80,19 @@ fun EventifyNavigation() {
             )
         ) { backStackEntry ->
             val eventId = backStackEntry.arguments?.getInt("eventId") ?: 0
-
-            // Find the event from dummy data
             val event = DummyData.events.find { it.id == eventId }
 
             if (event != null) {
-                CountdownTimerScreen(  // ← Changed from EventDetailsScreen
+                CountdownTimerScreen(
                     event = event,
                     onNavigateBack = {
                         navController.popBackStack()
                     },
                     onEdit = {
-                        // TODO: Navigate to edit screen (same as Add Event but with data)
                         navController.navigate(Routes.ADD_EVENT)
                     },
                     onDelete = {
                         // TODO: In Phase 2, delete from database
-                        // For now, just navigate back
                     }
                 )
             }
