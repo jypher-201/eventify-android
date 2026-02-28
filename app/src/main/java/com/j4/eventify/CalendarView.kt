@@ -36,10 +36,10 @@ data class CalendarEvent(
 )
 
 // Map dummy events to real calendar dates
-fun mapEventsToDays(): List<CalendarEvent> {
+fun mapEventsToDays(events: List<Event>): List<CalendarEvent> {  // ← Add parameter
     val philippinesZone = java.util.TimeZone.getTimeZone("Asia/Manila")
 
-    return DummyData.events.mapNotNull { event ->
+    return events.mapNotNull { event ->  // ← Use passed events, not DummyData
         val daysFromNow = event.countdownNumber.toIntOrNull() ?: return@mapNotNull null
         val eventCal = Calendar.getInstance(philippinesZone)
         eventCal.add(Calendar.DAY_OF_MONTH, daysFromNow)
@@ -57,7 +57,7 @@ fun mapEventsToDays(): List<CalendarEvent> {
 fun CalendarView(
     events: List<Event>,
     onEventClick: (Int) -> Unit,
-    onDateSelected: (String) -> Unit = {},  // ← NEW parameter
+    onDateSelected: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val philippinesZone = java.util.TimeZone.getTimeZone("Asia/Manila")
@@ -71,7 +71,7 @@ fun CalendarView(
     var currentYear by remember { mutableIntStateOf(todayYear) }
     var selectedDay by remember { mutableIntStateOf(todayDay) }
 
-    val calendarEvents = remember(events) { mapEventsToDays() }
+    val calendarEvents = remember(events) { mapEventsToDays(events) }  // ← Pass filtered events
 
     // Get events for selected day
     val selectedDayEvents = calendarEvents.filter {

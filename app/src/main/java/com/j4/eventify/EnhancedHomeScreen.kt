@@ -34,7 +34,6 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.animation.Crossfade
 
 enum class ViewMode {
     LIST,
@@ -52,7 +51,7 @@ enum class TimeFilter {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EnhancedHomeScreen(
-    onNavigateToAddEvent: (String?) -> Unit = { _ -> },  // ← Accept date parameter
+    onNavigateToAddEvent: (String?) -> Unit = { _ -> },
     onNavigateToEventDetails: (Int) -> Unit = {}
 ) {
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
@@ -65,9 +64,7 @@ fun EnhancedHomeScreen(
     var showTimeFilterMenu by remember { mutableStateOf(false) }
     var selectedCalendarDate by remember { mutableStateOf<String?>(null) }
 
-
     val filteredAndSortedEvents = remember(selectedFilter, searchQuery, timeFilter) {
-
         val filtered = if (selectedFilter != null) {
             DummyData.events.filter { it.type == selectedFilter }
         } else {
@@ -121,13 +118,9 @@ fun EnhancedHomeScreen(
         drawerContent = {
             DrawerContent(
                 selectedFilter = selectedFilter,
-                currentViewMode = viewMode,  // ← Pass current view mode
+                currentViewMode = viewMode,
                 onFilterSelected = { filter ->
                     selectedFilter = filter
-                    // Auto-switch to LIST view when filtering by event type
-                    if (filter != null && viewMode == ViewMode.CALENDAR) {
-                        viewMode = ViewMode.LIST
-                    }
                     scope.launch { drawerState.close() }
                 }
             )
@@ -141,10 +134,6 @@ fun EnhancedHomeScreen(
                         viewMode = viewMode,
                         onViewModeChange = { newMode ->
                             viewMode = newMode
-                            // Auto-clear event type filter when switching to CALENDAR
-                            if (newMode == ViewMode.CALENDAR && selectedFilter != null) {
-                                selectedFilter = null
-                            }
                         },
                         timeFilter = timeFilter,
                         onTimeFilterChange = { timeFilter = it },
@@ -158,13 +147,12 @@ fun EnhancedHomeScreen(
                 floatingActionButton = {
                     EventifyFAB(
                         onClick = {
-                            // Pass selected date only if in calendar view
                             val dateToPass = if (viewMode == ViewMode.CALENDAR) {
                                 selectedCalendarDate
                             } else {
                                 null
                             }
-                            onNavigateToAddEvent(dateToPass)  // ← Pass the date
+                            onNavigateToAddEvent(dateToPass)
                         }
                     )
                 }
@@ -178,29 +166,23 @@ fun EnhancedHomeScreen(
                             "No events found"
                     )
                 } else {
-                    Crossfade(
-                        targetState = viewMode,
-                        modifier = Modifier.padding(paddingValues),
-                        label = "view_mode_transition"
-                    ) { mode ->
-                        when (mode) {
-                            ViewMode.LIST -> {
-                                EventListView(
-                                    events = filteredAndSortedEvents,
-                                    onEventClick = onNavigateToEventDetails,
-                                    modifier = Modifier.fillMaxSize()
-                                )
-                            }
-                            ViewMode.CALENDAR -> {
-                                CalendarView(
-                                    events = filteredAndSortedEvents,
-                                    onEventClick = onNavigateToEventDetails,
-                                    onDateSelected = { date ->  // ← ADD THIS
-                                        selectedCalendarDate = date
-                                    },
-                                    modifier = Modifier.fillMaxSize()
-                                )
-                            }
+                    when (viewMode) {
+                        ViewMode.LIST -> {
+                            EventListView(
+                                events = filteredAndSortedEvents,
+                                onEventClick = onNavigateToEventDetails,
+                                modifier = Modifier.padding(paddingValues)
+                            )
+                        }
+                        ViewMode.CALENDAR -> {
+                            CalendarView(
+                                events = filteredAndSortedEvents,
+                                onEventClick = onNavigateToEventDetails,
+                                onDateSelected = { date ->
+                                    selectedCalendarDate = date
+                                },
+                                modifier = Modifier.padding(paddingValues)
+                            )
                         }
                     }
                 }
@@ -485,10 +467,10 @@ fun KeepStyleTopBar(
                                 modifier = Modifier.size(36.dp)
                             ) {
                                 Icon(
-                                    imageVector = if (viewMode == ViewMode.CALENDAR)  // ← REVERSED
-                                        Icons.Default.CalendarMonth      // In CALENDAR view, show Calendar icon
+                                    imageVector = if (viewMode == ViewMode.CALENDAR)
+                                        Icons.Default.CalendarMonth
                                     else
-                                        Icons.Default.ViewAgenda,        // In LIST view, show List icon
+                                        Icons.Default.ViewAgenda,
                                     contentDescription = if (viewMode == ViewMode.LIST)
                                         "Switch to Calendar view"
                                     else
@@ -501,7 +483,7 @@ fun KeepStyleTopBar(
                     }
                 }
 
-                // Notification Icon (instead of Profile)
+                // Notification Icon
                 Box(
                     modifier = Modifier
                         .size(36.dp)
@@ -522,6 +504,7 @@ fun KeepStyleTopBar(
         HorizontalDivider(color = Color(0xFFE0E0E0), thickness = 1.dp)
     }
 }
+
 @Composable
 fun DrawerContent(
     selectedFilter: EventType?,
@@ -551,19 +534,9 @@ fun DrawerContent(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Show hint if in calendar view
-            if (currentViewMode == ViewMode.CALENDAR) {
-                Text(
-                    text = "Filtering will switch to list view",
-                    fontSize = 12.sp,
-                    color = Color.Gray,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
-                )
-            }
-
-            // ALL EVENT TYPES - Clear filter option
+            // ALL EVENT TYPES
             DrawerItem(
-                icon = Icons.Default.GridView,  // or Icons.Default.Apps
+                icon = Icons.Default.GridView,
                 text = "All Event Types",
                 selected = selectedFilter == null,
                 color = Black,
@@ -572,7 +545,7 @@ fun DrawerContent(
 
             Spacer(modifier = Modifier.height(4.dp))
 
-            // Individual Event Type Filters
+            // Event Type Filters
             DrawerItem(
                 icon = Icons.Default.School,
                 text = "Academic",
@@ -611,6 +584,7 @@ fun DrawerContent(
         }
     }
 }
+
 @Composable
 fun DrawerItem(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
