@@ -5,35 +5,28 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.j4.eventify.components.Event
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.ui.graphics.SolidColor
 import com.j4.eventify.components.EventCard
 import com.j4.eventify.components.EventType
 import com.j4.eventify.ui.theme.*
 import kotlinx.coroutines.launch
-import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.Notifications
 
 enum class ViewMode {
     LIST,
@@ -50,7 +43,7 @@ enum class TimeFilter {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun EnhancedHomeScreen(
+fun HomeScreen(
     onNavigateToAddEvent: (String?) -> Unit = { _ -> },
     onNavigateToEventDetails: (Int) -> Unit = {}
 ) {
@@ -64,6 +57,7 @@ fun EnhancedHomeScreen(
     var showTimeFilterMenu by remember { mutableStateOf(false) }
     var selectedCalendarDate by remember { mutableStateOf<String?>(null) }
 
+    // Optimized filtering with remember
     val filteredAndSortedEvents = remember(selectedFilter, searchQuery, timeFilter) {
         val filtered = if (selectedFilter != null) {
             DummyData.events.filter { it.type == selectedFilter }
@@ -80,45 +74,30 @@ fun EnhancedHomeScreen(
             filtered
         }
 
-        // Time filtering
         val timeFiltered = when (timeFilter) {
             TimeFilter.ALL -> searched
-            TimeFilter.TODAY -> {
-                searched.filter { event ->
-                    val daysFromNow = event.countdownNumber.toIntOrNull() ?: 999
-                    daysFromNow == 0
-                }
+            TimeFilter.TODAY -> searched.filter {
+                (it.countdownNumber.toIntOrNull() ?: 999) == 0
             }
-            TimeFilter.TOMORROW -> {
-                searched.filter { event ->
-                    val daysFromNow = event.countdownNumber.toIntOrNull() ?: 999
-                    daysFromNow == 1
-                }
+            TimeFilter.TOMORROW -> searched.filter {
+                (it.countdownNumber.toIntOrNull() ?: 999) == 1
             }
-            TimeFilter.THIS_WEEK -> {
-                searched.filter { event ->
-                    val daysFromNow = event.countdownNumber.toIntOrNull() ?: 999
-                    daysFromNow in 0..7
-                }
+            TimeFilter.THIS_WEEK -> searched.filter {
+                (it.countdownNumber.toIntOrNull() ?: 999) in 0..7
             }
-            TimeFilter.THIS_MONTH -> {
-                searched.filter { event ->
-                    val daysFromNow = event.countdownNumber.toIntOrNull() ?: 999
-                    daysFromNow in 0..30
-                }
+            TimeFilter.THIS_MONTH -> searched.filter {
+                (it.countdownNumber.toIntOrNull() ?: 999) in 0..30
             }
         }
 
-        // Always sort by date (soonest first)
         timeFiltered.sortedBy { it.countdownNumber.toIntOrNull() ?: 999 }
     }
 
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
-            DrawerContent(
+            ModernDrawer(
                 selectedFilter = selectedFilter,
-                currentViewMode = viewMode,
                 onFilterSelected = { filter ->
                     selectedFilter = filter
                     scope.launch { drawerState.close() }
@@ -127,21 +106,18 @@ fun EnhancedHomeScreen(
         },
         content = {
             Scaffold(
+                containerColor = Color(0xFFFAFAFA),
                 topBar = {
-                    KeepStyleTopBar(
+                    ModernTopBar(
                         searchQuery = searchQuery,
                         onSearchQueryChange = { searchQuery = it },
                         viewMode = viewMode,
-                        onViewModeChange = { newMode ->
-                            viewMode = newMode
-                        },
+                        onViewModeChange = { viewMode = it },
                         timeFilter = timeFilter,
                         onTimeFilterChange = { timeFilter = it },
                         showTimeFilterMenu = showTimeFilterMenu,
                         onShowTimeFilterMenuChange = { showTimeFilterMenu = it },
-                        onMenuClick = {
-                            scope.launch { drawerState.open() }
-                        }
+                        onMenuClick = { scope.launch { drawerState.open() } }
                     )
                 },
                 floatingActionButton = {
@@ -149,40 +125,53 @@ fun EnhancedHomeScreen(
                         onClick = {
                             val dateToPass = if (viewMode == ViewMode.CALENDAR) {
                                 selectedCalendarDate
-                            } else {
-                                null
-                            }
+                            } else null
                             onNavigateToAddEvent(dateToPass)
                         }
                     )
                 }
             ) { paddingValues ->
-                if (filteredAndSortedEvents.isEmpty()) {
-                    EmptyState(
-                        modifier = Modifier.padding(paddingValues),
-                        message = if (searchQuery.isNotBlank())
-                            "No events found for \"$searchQuery\""
-                        else
-                            "No events found"
-                    )
-                } else {
-                    when (viewMode) {
-                        ViewMode.LIST -> {
-                            EventListView(
-                                events = filteredAndSortedEvents,
-                                onEventClick = onNavigateToEventDetails,
-                                modifier = Modifier.padding(paddingValues)
-                            )
-                        }
-                        ViewMode.CALENDAR -> {
-                            CalendarView(
-                                events = filteredAndSortedEvents,
-                                onEventClick = onNavigateToEventDetails,
-                                onDateSelected = { date ->
-                                    selectedCalendarDate = date
-                                },
-                                modifier = Modifier.padding(paddingValues)
-                            )
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues)
+                ) {
+                    if (filteredAndSortedEvents.isEmpty()) {
+                        ModernEmptyState(
+                            message = if (searchQuery.isNotBlank())
+                                "No events found for \"$searchQuery\""
+                            else
+                                "No events found"
+                        )
+                    } else {
+                        when (viewMode) {
+                            ViewMode.LIST -> {
+                                LazyColumn(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentPadding = PaddingValues(16.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)  // ← Changed from 12dp to 8dp
+                                ) {
+                                    items(
+                                        items = filteredAndSortedEvents,
+                                        key = { it.id }
+                                    ) { event ->
+                                        EventCard(
+                                            event = event,
+                                            onClick = { onNavigateToEventDetails(event.id) }
+                                        )
+                                    }
+                                }
+                            }
+                            ViewMode.CALENDAR -> {
+                                CalendarView(
+                                    events = filteredAndSortedEvents,
+                                    onEventClick = onNavigateToEventDetails,
+                                    onDateSelected = { date ->
+                                        selectedCalendarDate = date
+                                    },
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
                         }
                     }
                 }
@@ -193,7 +182,7 @@ fun EnhancedHomeScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun KeepStyleTopBar(
+fun ModernTopBar(
     searchQuery: String,
     onSearchQueryChange: (String) -> Unit,
     viewMode: ViewMode,
@@ -223,7 +212,6 @@ fun KeepStyleTopBar(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Back button
                 IconButton(
                     onClick = {
                         isSearchExpanded = false
@@ -235,18 +223,17 @@ fun KeepStyleTopBar(
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Back",
-                        tint = Black,
+                        tint = Color(0xFF667eea),
                         modifier = Modifier.size(24.dp)
                     )
                 }
 
-                // Expanded Search bar
                 Box(
                     modifier = Modifier
                         .weight(1f)
                         .height(48.dp)
-                        .clip(RoundedCornerShape(28.dp))
-                        .background(Color(0xFFF1F3F4))
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(Color(0xFFF5F5F5))
                 ) {
                     Row(
                         modifier = Modifier
@@ -258,7 +245,6 @@ fun KeepStyleTopBar(
                             modifier = Modifier.weight(1f),
                             contentAlignment = Alignment.CenterStart
                         ) {
-                            // Placeholder
                             if (searchQuery.isEmpty()) {
                                 Text(
                                     text = "Search events",
@@ -267,7 +253,6 @@ fun KeepStyleTopBar(
                                 )
                             }
 
-                            // BasicTextField
                             BasicTextField(
                                 value = searchQuery,
                                 onValueChange = onSearchQueryChange,
@@ -276,14 +261,13 @@ fun KeepStyleTopBar(
                                     .focusRequester(focusRequester),
                                 textStyle = androidx.compose.ui.text.TextStyle(
                                     fontSize = 16.sp,
-                                    color = Black
+                                    color = Color(0xFF1A1A1A)
                                 ),
                                 singleLine = true,
-                                cursorBrush = SolidColor(Black)
+                                cursorBrush = SolidColor(Color(0xFF667eea))
                             )
                         }
 
-                        // Clear button
                         if (searchQuery.isNotEmpty()) {
                             IconButton(
                                 onClick = { onSearchQueryChange("") },
@@ -292,7 +276,7 @@ fun KeepStyleTopBar(
                                 Icon(
                                     imageVector = Icons.Default.Close,
                                     contentDescription = "Clear",
-                                    tint = Black,
+                                    tint = Color.Gray,
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
@@ -316,7 +300,6 @@ fun KeepStyleTopBar(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Hamburger menu
                 IconButton(
                     onClick = onMenuClick,
                     modifier = Modifier.size(44.dp)
@@ -324,18 +307,17 @@ fun KeepStyleTopBar(
                     Icon(
                         imageVector = Icons.Default.Menu,
                         contentDescription = "Menu",
-                        tint = Black,
+                        tint = Color(0xFF1A1A1A),
                         modifier = Modifier.size(24.dp)
                     )
                 }
 
-                // Collapsed Search bar
                 Box(
                     modifier = Modifier
                         .weight(1f)
                         .height(48.dp)
-                        .clip(RoundedCornerShape(28.dp))
-                        .background(Color(0xFFF1F3F4))
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(Color(0xFFF5F5F5))
                         .clickable { isSearchExpanded = true },
                     contentAlignment = Alignment.CenterStart
                 ) {
@@ -367,7 +349,6 @@ fun KeepStyleTopBar(
                             horizontalArrangement = Arrangement.spacedBy(0.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Time Filter button
                             Box {
                                 IconButton(
                                     onClick = {
@@ -381,12 +362,12 @@ fun KeepStyleTopBar(
                                     Icon(
                                         imageVector = Icons.Default.AccessTime,
                                         contentDescription = "Filter by time",
-                                        tint = if (viewMode == ViewMode.LIST) Black else Color.Gray,
+                                        tint = if (viewMode == ViewMode.LIST)
+                                            Color(0xFF667eea) else Color.Gray,
                                         modifier = Modifier.size(20.dp)
                                     )
                                 }
 
-                                // Time filter dropdown menu - only show in LIST view
                                 if (viewMode == ViewMode.LIST) {
                                     DropdownMenu(
                                         expanded = showTimeFilterMenu,
@@ -397,7 +378,8 @@ fun KeepStyleTopBar(
                                             text = {
                                                 Text(
                                                     "All Events",
-                                                    fontWeight = if (timeFilter == TimeFilter.ALL) FontWeight.Bold else FontWeight.Normal
+                                                    fontWeight = if (timeFilter == TimeFilter.ALL)
+                                                        FontWeight.Bold else FontWeight.Normal
                                                 )
                                             },
                                             onClick = {
@@ -409,7 +391,8 @@ fun KeepStyleTopBar(
                                             text = {
                                                 Text(
                                                     "Today",
-                                                    fontWeight = if (timeFilter == TimeFilter.TODAY) FontWeight.Bold else FontWeight.Normal
+                                                    fontWeight = if (timeFilter == TimeFilter.TODAY)
+                                                        FontWeight.Bold else FontWeight.Normal
                                                 )
                                             },
                                             onClick = {
@@ -421,7 +404,8 @@ fun KeepStyleTopBar(
                                             text = {
                                                 Text(
                                                     "Tomorrow",
-                                                    fontWeight = if (timeFilter == TimeFilter.TOMORROW) FontWeight.Bold else FontWeight.Normal
+                                                    fontWeight = if (timeFilter == TimeFilter.TOMORROW)
+                                                        FontWeight.Bold else FontWeight.Normal
                                                 )
                                             },
                                             onClick = {
@@ -433,7 +417,8 @@ fun KeepStyleTopBar(
                                             text = {
                                                 Text(
                                                     "This Week",
-                                                    fontWeight = if (timeFilter == TimeFilter.THIS_WEEK) FontWeight.Bold else FontWeight.Normal
+                                                    fontWeight = if (timeFilter == TimeFilter.THIS_WEEK)
+                                                        FontWeight.Bold else FontWeight.Normal
                                                 )
                                             },
                                             onClick = {
@@ -445,7 +430,8 @@ fun KeepStyleTopBar(
                                             text = {
                                                 Text(
                                                     "This Month",
-                                                    fontWeight = if (timeFilter == TimeFilter.THIS_MONTH) FontWeight.Bold else FontWeight.Normal
+                                                    fontWeight = if (timeFilter == TimeFilter.THIS_MONTH)
+                                                        FontWeight.Bold else FontWeight.Normal
                                                 )
                                             },
                                             onClick = {
@@ -457,11 +443,11 @@ fun KeepStyleTopBar(
                                 }
                             }
 
-                            // View mode toggle (List/Calendar)
                             IconButton(
                                 onClick = {
                                     onViewModeChange(
-                                        if (viewMode == ViewMode.LIST) ViewMode.CALENDAR else ViewMode.LIST
+                                        if (viewMode == ViewMode.LIST)
+                                            ViewMode.CALENDAR else ViewMode.LIST
                                     )
                                 },
                                 modifier = Modifier.size(36.dp)
@@ -471,11 +457,8 @@ fun KeepStyleTopBar(
                                         Icons.Default.CalendarMonth
                                     else
                                         Icons.Default.ViewAgenda,
-                                    contentDescription = if (viewMode == ViewMode.LIST)
-                                        "Switch to Calendar view"
-                                    else
-                                        "Switch to List view",
-                                    tint = Black,
+                                    contentDescription = "Toggle view",
+                                    tint = Color(0xFF667eea),
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
@@ -483,32 +466,27 @@ fun KeepStyleTopBar(
                     }
                 }
 
-                // Notification Icon
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .clickable { /* TODO: Show notifications */ },
-                    contentAlignment = Alignment.Center
+                IconButton(
+                    onClick = { /* TODO */ },
+                    modifier = Modifier.size(44.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Notifications,
                         contentDescription = "Notifications",
-                        tint = Black,
+                        tint = Color(0xFF1A1A1A),
                         modifier = Modifier.size(22.dp)
                     )
                 }
             }
         }
 
-        HorizontalDivider(color = Color(0xFFE0E0E0), thickness = 1.dp)
+        HorizontalDivider(color = Color(0xFFE8E8E8), thickness = 1.dp)
     }
 }
 
 @Composable
-fun DrawerContent(
+fun ModernDrawer(
     selectedFilter: EventType?,
-    currentViewMode: ViewMode,
     onFilterSelected: (EventType?) -> Unit
 ) {
     ModalDrawerSheet(
@@ -518,55 +496,50 @@ fun DrawerContent(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Header
             Text(
-                text = "EVENTIFY",
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                color = Black,
-                modifier = Modifier.padding(vertical = 16.dp)
+                "EVENTIFY",
+                fontSize = 26.sp,
+                fontWeight = FontWeight.Black,
+                color = Color(0xFF1A1A1A),
+                modifier = Modifier.padding(vertical = 12.dp)
             )
 
             HorizontalDivider(color = Color(0xFFE0E0E0))
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // ALL EVENT TYPES
-            DrawerItem(
+            ModernDrawerItem(
                 icon = Icons.Default.GridView,
-                text = "All Event Types",
+                text = "All Events",
                 selected = selectedFilter == null,
-                color = Black,
+                color = Color(0xFF667eea),
                 onClick = { onFilterSelected(null) }
             )
 
-            Spacer(modifier = Modifier.height(4.dp))
-
-            // Event Type Filters
-            DrawerItem(
+            ModernDrawerItem(
                 icon = Icons.Default.School,
                 text = "Academic",
                 selected = selectedFilter == EventType.ACADEMIC,
-                color = AcademicBlue,
+                color = Color(0xFF667eea),
                 onClick = { onFilterSelected(EventType.ACADEMIC) }
             )
 
-            DrawerItem(
+            ModernDrawerItem(
                 icon = Icons.Default.FitnessCenter,
                 text = "Personal",
                 selected = selectedFilter == EventType.PERSONAL,
-                color = PersonalPink,
+                color = Color(0xFFf093fb),
                 onClick = { onFilterSelected(EventType.PERSONAL) }
             )
 
-            DrawerItem(
+            ModernDrawerItem(
                 icon = Icons.Default.Cake,
                 text = "Occasion",
                 selected = selectedFilter == EventType.OCCASION,
-                color = OccasionYellow,
+                color = Color(0xFFfcb69f),
                 onClick = { onFilterSelected(EventType.OCCASION) }
             )
 
@@ -574,101 +547,78 @@ fun DrawerContent(
 
             HorizontalDivider(color = Color(0xFFE0E0E0))
 
-            // About
-            DrawerItem(
+            ModernDrawerItem(
                 icon = Icons.Default.Info,
                 text = "About",
                 selected = false,
-                onClick = { /* TODO: Show about dialog/screen */ }
+                color = Color.Gray,
+                onClick = { /* TODO */ }
             )
         }
     }
 }
 
 @Composable
-fun DrawerItem(
+fun ModernDrawerItem(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     text: String,
     selected: Boolean,
-    color: Color = Black,
+    color: Color,
     onClick: () -> Unit
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .background(if (selected) Color(0xFFE8F0FE) else Color.Transparent)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(16.dp)
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(12.dp),
+        color = if (selected) color.copy(alpha = 0.1f) else Color.Transparent
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = text,
-            tint = if (selected) color else Color.Gray
-        )
-        Text(
-            text = text,
-            fontSize = 16.sp,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-            color = if (selected) Black else Color.DarkGray
-        )
-    }
-}
-
-@Composable
-fun EventListView(
-    events: List<Event>,
-    onEventClick: (Int) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    LazyColumn(
-        modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        items(events) { event ->
-            EventCard(
-                event = event,
-                onClick = { onEventClick(event.id) }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Icon(
+                icon,
+                text,
+                tint = if (selected) color else Color.Gray,
+                modifier = Modifier.size(22.dp)
+            )
+            Text(
+                text,
+                fontSize = 15.sp,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                color = if (selected) Color(0xFF1A1A1A) else Color.Gray
             )
         }
     }
 }
 
 @Composable
-fun EmptyState(
-    modifier: Modifier = Modifier,
-    message: String = "No events found"
-) {
+fun ModernEmptyState(message: String) {
     Box(
-        modifier = modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(
-                text = message,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                "📭",
+                fontSize = 64.sp
             )
             Text(
-                text = "Try a different filter or search",
+                message,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF1A1A1A)
+            )
+            Text(
+                "Try adjusting your filters",
                 fontSize = 14.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = Color.Gray
             )
         }
-    }
-}
-
-@Preview(showBackground = true, showSystemUi = true)
-@Composable
-fun EnhancedHomeScreenPreview() {
-    EventifyTheme {
-        EnhancedHomeScreen()
     }
 }

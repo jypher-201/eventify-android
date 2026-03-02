@@ -13,7 +13,7 @@ import androidx.navigation.navArgument
 object Routes {
     const val HOME = "home"
     const val ADD_EVENT = "add_event"
-    const val EVENT_DETAILS = "event_details"  // ← FIXED: Removed /{eventId}
+    const val EVENT_DETAILS = "event_details"
 
     fun eventDetails(eventId: Int) = "event_details/$eventId"
 }
@@ -31,7 +31,7 @@ fun EventifyNavigation() {
     ) {
         // Home Screen
         composable(route = Routes.HOME) {
-            EnhancedHomeScreen(
+            HomeScreen(
                 onNavigateToAddEvent = { selectedDate ->
                     if (selectedDate != null) {
                         navController.currentBackStackEntry
@@ -41,7 +41,7 @@ fun EventifyNavigation() {
                     navController.navigate(Routes.ADD_EVENT)
                 },
                 onNavigateToEventDetails = { eventId ->
-                    navController.navigate(Routes.eventDetails(eventId))  // ← FIXED: Use helper
+                    navController.navigate(Routes.eventDetails(eventId))
                 }
             )
         }
@@ -72,7 +72,7 @@ fun EventifyNavigation() {
 
         // Event Details Screen
         composable(
-            route = "${Routes.EVENT_DETAILS}/{eventId}",  // ← FIXED: Properly combined
+            route = "${Routes.EVENT_DETAILS}/{eventId}",
             arguments = listOf(
                 navArgument("eventId") {
                     type = NavType.IntType
