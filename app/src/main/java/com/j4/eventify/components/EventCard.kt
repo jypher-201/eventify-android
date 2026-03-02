@@ -1,51 +1,42 @@
 package com.j4.eventify.components
 
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.j4.eventify.ui.theme.AcademicBlue
-import com.j4.eventify.ui.theme.BadgeAcademic
-import com.j4.eventify.ui.theme.Black
-import com.j4.eventify.ui.theme.EventifyTheme
-import com.j4.eventify.ui.theme.OccasionYellow
-import com.j4.eventify.ui.theme.PersonalPink
-import com.j4.eventify.ui.theme.White
 
-// ============ DATA MODELS ============
-
+/**
+ * Event Type Enum
+ */
 enum class EventType {
     ACADEMIC,
     PERSONAL,
     OCCASION
 }
 
-enum class TimeFilter {
-    RECENT,
-    THIS_WEEK,
-    THIS_MONTH,
-    ALL_TIME
-}
-
+/**
+ * Event Data Class
+ */
 data class Event(
     val id: Int,
     val title: String,
@@ -56,191 +47,209 @@ data class Event(
     val notes: String = ""
 )
 
-// ============ UI COMPONENT ============
-
+/**
+ * Ultimate Glassmorphism Event Card
+ * - RELIABLE smooth zoom animation
+ * - Perfect rounded shadows
+ * - Consistent press feedback
+ */
 @Composable
 fun EventCard(
     event: Event,
     modifier: Modifier = Modifier,
     onClick: () -> Unit = {}
 ) {
-    val backgroundColor = when (event.type) {
-        EventType.ACADEMIC -> AcademicBlue
-        EventType.PERSONAL -> PersonalPink
-        EventType.OCCASION -> OccasionYellow
+    // Pre-compute colors
+    val (backgroundColor, textColor, badgeColor) = remember(event.type) {
+        when (event.type) {
+            EventType.ACADEMIC -> Triple(
+                Brush.linearGradient(listOf(Color(0xFF667eea), Color(0xFF764ba2))),
+                Color.White,
+                Color(0xFF5E35B1)
+            )
+            EventType.PERSONAL -> Triple(
+                Brush.linearGradient(listOf(Color(0xFFf093fb), Color(0xFFF5576C))),
+                Color.White,
+                Color(0xFFD81B60)
+            )
+            EventType.OCCASION -> Triple(
+                Brush.linearGradient(listOf(Color(0xFFffecd2), Color(0xFFfcb69f))),
+                Color(0xFF8B4513),
+                Color(0xFFEF6C00)
+            )
+        }
     }
 
-    val badgeColor = when (event.type) {
-        EventType.ACADEMIC -> BadgeAcademic
-        EventType.PERSONAL -> Color(0xFF00E676)
-        EventType.OCCASION -> Color(0xFF9C27B0)
-    }
+    // ✅ RELIABLE: Direct state management for press
+    var isPressed by remember { mutableStateOf(false) }
 
-    val textColor = when (event.type) {
-        EventType.OCCASION -> Black
-        else -> White
-    }
+    // Smooth zoom animation
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.96f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "zoom_scale"
+    )
 
-    Box(modifier = modifier) {
+    // Smooth shadow animation
+    val shadowElevation by animateDpAsState(
+        targetValue = if (isPressed) 4.dp else 12.dp,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "shadow_elevation"
+    )
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(110.dp)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+    ) {
+        // Shadow layer - perfectly rounded
         Box(
             modifier = Modifier
-                .matchParentSize()
-                .offset(x = 6.dp, y = 6.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(Black)
-        )
-
-        Card(
-            onClick = onClick,
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
-            colors = CardDefaults.cardColors(containerColor = backgroundColor),
-            elevation = CardDefaults.cardElevation(0.dp)
+                .fillMaxSize()
+                .shadow(
+                    elevation = shadowElevation,
+                    shape = RoundedCornerShape(20.dp),
+                    clip = false
+                )
+                .clip(RoundedCornerShape(20.dp))
+                .background(backgroundColor)
+                .pointerInput(Unit) {
+                    detectTapGestures(
+                        onPress = {
+                            isPressed = true  // ✅ Press detected
+                            val released = tryAwaitRelease()
+                            isPressed = false  // ✅ Release detected
+                            if (released) {
+                                onClick()  // ✅ Call onClick only on successful tap
+                            }
+                        }
+                    )
+                }
         ) {
+            // Glassmorphism overlay
             Box(
                 modifier = Modifier
-                    .border(4.dp, Black, RoundedCornerShape(12.dp))
-                    .padding(12.dp)  // ← Changed from 16dp to 12dp (25% reduction)
+                    .fillMaxSize()
+                    .drawBehind {
+                        drawRect(Color.White.copy(alpha = 0.1f))
+                    }
+                    .padding(16.dp)
             ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxSize(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    // Left side - Event info
                     Column(
                         modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)  // ← Changed from 6dp to 4dp
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text(
-                            text = event.title,
-                            fontSize = 16.sp,  // ← Changed from 18sp to 16sp
-                            fontWeight = FontWeight.Bold,
-                            color = textColor,
-                            lineHeight = 20.sp  // ← Changed from 22sp to 20sp
-                        )
-
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth(0.45f)  // ← Changed from 0.5f to 0.45f
-                                .padding(top = 1.dp)  // ← Changed from 2dp to 1dp
-                                .background(textColor)
-                                .padding(vertical = 0.8.dp)  // ← Changed from 1dp to 0.8dp
-                        )
-
-                        Text(
-                            text = event.dateTime,
-                            fontSize = 11.sp,  // ← Changed from 12sp to 11sp
-                            fontWeight = FontWeight.Bold,
-                            color = textColor.copy(alpha = 0.8f)
-                        )
-
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(badgeColor)
-                                .padding(horizontal = 8.dp, vertical = 3.dp)  // ← Changed from 10dp, 4dp
+                        // Title and Badge row
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = event.type.name,
-                                fontSize = 10.sp,  // ← Changed from 11sp to 10sp
+                                text = event.title,
+                                fontSize = 16.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Black
+                                color = textColor,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f, fill = false)
+                            )
+
+                            Spacer(modifier = Modifier.width(8.dp))
+
+                            // Type badge
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(Color.White.copy(alpha = 0.9f))
+                                    .border(
+                                        width = 1.5.dp,
+                                        color = textColor.copy(alpha = 0.5f),
+                                        shape = RoundedCornerShape(12.dp)
+                                    )
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Text(
+                                    text = event.type.name,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = badgeColor,
+                                    letterSpacing = 0.5.sp
+                                )
+                            }
+                        }
+
+                        // Date & Time
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Schedule,
+                                contentDescription = null,
+                                tint = textColor.copy(alpha = 0.8f),
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Text(
+                                text = event.dateTime,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = textColor.copy(alpha = 0.8f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                     }
 
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        Text(
-                            text = event.countdownNumber,
-                            fontSize = 32.sp,  // ← Changed from 42sp to 32sp (24% reduction)
-                            fontWeight = FontWeight.Black,
-                            color = textColor,
-                            lineHeight = 32.sp  // ← Changed from 42sp to 32sp
-                        )
+                    Spacer(modifier = Modifier.width(12.dp))
 
-                        Text(
-                            text = event.countdownLabel,
-                            fontSize = 11.sp,  // ← Changed from 12sp to 11sp
-                            fontWeight = FontWeight.Bold,
-                            color = textColor,
-                            letterSpacing = 0.5.sp
-                        )
+                    // Countdown circle
+                    Box(
+                        modifier = Modifier
+                            .size(60.dp)
+                            .clip(CircleShape)
+                            .drawBehind {
+                                drawCircle(Color.White.copy(alpha = 0.25f))
+                            }
+                            .border(2.5.dp, Color.White.copy(alpha = 0.5f), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = event.countdownNumber,
+                                fontSize = 22.sp,
+                                fontWeight = FontWeight.Black,
+                                color = textColor
+                            )
+                            Text(
+                                text = event.countdownLabel,
+                                fontSize = 8.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = textColor.copy(alpha = 0.8f),
+                                letterSpacing = 0.3.sp
+                            )
+                        }
                     }
                 }
             }
-        }
-    }
-}
-// ============ PREVIEWS ============
-
-@Preview(showBackground = true)
-@Composable
-fun EventCardAcademicPreview() {
-    EventifyTheme {
-        Box(
-            modifier = Modifier
-                .background(MaterialTheme.colorScheme.background)
-                .padding(16.dp)
-        ) {
-            EventCard(
-                event = Event(
-                    id = 1,
-                    title = "Project Deadline",
-                    type = EventType.ACADEMIC,
-                    dateTime = "Due: Feb 25, 2024",
-                    countdownNumber = "5",
-                    countdownLabel = "DAYS LEFT"
-                )
-            )
-        }
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun EventCardPersonalPreview() {
-    EventifyTheme {
-        Box(
-            modifier = Modifier
-                .background(MaterialTheme.colorScheme.background)
-                .padding(16.dp)
-        ) {
-            EventCard(
-                event = Event(
-                    id = 2,
-                    title = "Gym Workout",
-                    type = EventType.PERSONAL,
-                    dateTime = "Tomorrow, 10:00 AM",
-                    countdownNumber = "1",
-                    countdownLabel = "DAY LEFT"
-                )
-            )
-        }
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun EventCardOccasionPreview() {
-    EventifyTheme {
-        Box(
-            modifier = Modifier
-                .background(MaterialTheme.colorScheme.background)
-                .padding(16.dp)
-        ) {
-            EventCard(
-                event = Event(
-                    id = 3,
-                    title = "Birthday Party",
-                    type = EventType.OCCASION,
-                    dateTime = "Today at 7:00 PM",
-                    countdownNumber = "NOW",
-                    countdownLabel = "HAPPENING"
-                )
-            )
         }
     }
 }
