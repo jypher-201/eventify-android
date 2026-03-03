@@ -19,6 +19,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -206,33 +207,38 @@ fun EventCard(
 
                     Spacer(modifier = Modifier.width(12.dp))
 
+                    // Countdown circle - PERFECTLY CENTERED
                     Box(
                         modifier = Modifier
-                            .size(60.dp)  // ← INCREASED from 56dp
+                            .size(60.dp)
                             .clip(CircleShape)
                             .drawBehind {
                                 drawCircle(Color.White.copy(alpha = 0.25f))
                             }
                             .border(2.5.dp, Color.White.copy(alpha = 0.5f), CircleShape),
-                        contentAlignment = Alignment.Center
+                        contentAlignment = Alignment.Center  // ← This ensures perfect centering
                     ) {
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                            verticalArrangement = Arrangement.Center,  // ← Center vertically
+                            modifier = Modifier.fillMaxSize()  // ← Fill the entire circle
                         ) {
                             Text(
                                 text = event.countdownNumber,
-                                fontSize = 26.sp,  // ← INCREASED from 24sp
+                                fontSize = 26.sp,
                                 fontWeight = FontWeight.Black,
                                 color = textColor,
-                                lineHeight = 26.sp
+                                lineHeight = 26.sp,
+                                textAlign = TextAlign.Center  // ← Center align
                             )
+                            Spacer(modifier = Modifier.height(1.dp))  // ← Tiny spacer
                             Text(
                                 text = event.countdownLabel,
-                                fontSize = 9.sp,  // ← INCREASED from 8.5sp
+                                fontSize = 9.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = textColor.copy(alpha = 0.8f),
-                                letterSpacing = 0.4.sp
+                                letterSpacing = 0.4.sp,
+                                textAlign = TextAlign.Center  // ← Center align
                             )
                         }
                     }
