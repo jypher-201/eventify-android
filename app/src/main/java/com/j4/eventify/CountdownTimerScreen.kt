@@ -1,5 +1,6 @@
 package com.j4.eventify
 
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -13,11 +14,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.j4.eventify.components.Event
@@ -28,9 +32,6 @@ import androidx.compose.material.icons.automirrored.filled.Notes
 import androidx.compose.material.icons.automirrored.filled.Label
 import androidx.compose.runtime.LaunchedEffect
 import java.util.Locale
-import androidx.compose.animation.core.*
-import androidx.compose.ui.draw.rotate
-
 
 data class TimeRemaining(
     val days: Int,
@@ -55,7 +56,6 @@ fun calculateTimeRemaining(countdownNumber: String): TimeRemaining {
     val targetTime = targetCalendar.timeInMillis
     val diff = targetTime - currentTime
 
-    // Handle negative time (event has passed)
     if (diff <= 0) {
         return TimeRemaining(0, 0, 0, 0)
     }
@@ -83,27 +83,31 @@ fun CountdownTimerScreen(
     onDelete: () -> Unit = {}
 ) {
     val backgroundColor = when (event.type) {
-        EventType.ACADEMIC -> AcademicBlue
-        EventType.PERSONAL -> PersonalPink
-        EventType.OCCASION -> OccasionYellow
+        EventType.ACADEMIC -> Brush.linearGradient(
+            colors = listOf(Color(0xFF667eea), Color(0xFF764ba2))
+        )
+        EventType.PERSONAL -> Brush.linearGradient(
+            colors = listOf(Color(0xFFf093fb), Color(0xFFF5576C))
+        )
+        EventType.OCCASION -> Brush.linearGradient(
+            colors = listOf(Color(0xFFffecd2), Color(0xFFfcb69f))
+        )
     }
 
-    val textColor = if (event.type == EventType.OCCASION) Black else White
+    val textColor = if (event.type == EventType.OCCASION) Color(0xFF8B4513) else Color.White
 
     var showDeleteDialog by remember { mutableStateOf(false) }
-
-    // Real-time countdown state
     var timeRemaining by remember { mutableStateOf(calculateTimeRemaining(event.countdownNumber)) }
 
     // Update countdown every second
-    LaunchedEffect(event.id) {  // ← Added event.id as key
+    LaunchedEffect(event.id) {
         while (true) {
             kotlinx.coroutines.delay(1000L)
             timeRemaining = calculateTimeRemaining(event.countdownNumber)
         }
     }
 
-// Rotating effect for decorative circles
+    // Rotating circles animation
     val infiniteTransition = rememberInfiniteTransition(label = "rotation")
     val rotation by infiniteTransition.animateFloat(
         initialValue = 0f,
@@ -115,136 +119,113 @@ fun CountdownTimerScreen(
         label = "rotation"
     )
 
+    // Fade in animation
+    var visible by remember { mutableStateOf(false) }
+    val alpha by animateFloatAsState(
+        targetValue = if (visible) 1f else 0f,
+        animationSpec = tween(800),
+        label = "fade_in"
+    )
 
+    LaunchedEffect(Unit) {
+        visible = true
+    }
 
     Scaffold(
-        topBar = {
-            CountdownTopBar(
-                onNavigateBack = onNavigateBack,
-                onEdit = onEdit,
-                onDelete = { showDeleteDialog = true },
-                backgroundColor = backgroundColor,
-                textColor = textColor
-            )
-        }
+        containerColor = Color.Transparent
     ) { paddingValues ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(backgroundColor)
                 .padding(paddingValues)
+                .graphicsLayer { this.alpha = alpha }
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
+                    .statusBarsPadding()
                     .padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
-                // Main Countdown Display - WITH ROTATING CIRCLES
+                // Modern Top Bar
+                ModernCountdownTopBar(
+                    onNavigateBack = onNavigateBack,
+                    onEdit = onEdit,
+                    onDelete = { showDeleteDialog = true },
+                    textColor = textColor
+                )
+
+                // Main Countdown with rotating circles
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(32.dp),
                     modifier = Modifier
                         .weight(1f)
-                        .wrapContentHeight(Alignment.CenterVertically)  // ← Center vertically
+                        .wrapContentHeight(Alignment.CenterVertically)
                 ) {
-                    // Event title at top
+                    // Event title
                     Text(
                         text = event.title.uppercase(),
-                        fontSize = 32.sp,
+                        fontSize = 28.sp,
                         fontWeight = FontWeight.Black,
                         color = textColor,
                         textAlign = TextAlign.Center,
                         maxLines = 2,
-                        letterSpacing = 2.sp,
+                        letterSpacing = 1.5.sp,
                         fontFamily = FontFamily.Default
                     )
 
                     // Decorative line
                     Box(
                         modifier = Modifier
-                            .width(200.dp)
+                            .width(150.dp)
                             .height(4.dp)
+                            .clip(RoundedCornerShape(2.dp))
                             .background(textColor)
                     )
 
-                    // Rotating circles with countdown - IRREGULAR OVERLAPPING SHAPES
+                    // Rotating circles with countdown
                     Box(
-                        modifier = Modifier.size(380.dp),
+                        modifier = Modifier.size(340.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        // Oblong circle 1 - Wider horizontally
+                        // Outer rotating ring
                         Box(
                             modifier = Modifier
-                                .width(360.dp)
-                                .height(320.dp)
+                                .size(320.dp)
                                 .rotate(rotation)
-                                .border(
-                                    width = 10.dp,
-                                    color = textColor.copy(alpha = 0.4f),
-                                    shape = RoundedCornerShape(50)  // ← Creates oblong shape
-                                )
+                                .border(8.dp, textColor.copy(alpha = 0.3f), CircleShape)
                         )
 
-                        // Oblong circle 2 - Taller vertically (opposite)
+                        // Middle rotating ring (opposite)
                         Box(
                             modifier = Modifier
-                                .width(300.dp)
-                                .height(340.dp)
-                                .rotate(-rotation * 1.2f)  // ← Different speed, opposite direction
-                                .border(
-                                    width = 12.dp,
-                                    color = textColor.copy(alpha = 0.35f),
-                                    shape = RoundedCornerShape(50)
-                                )
-                        )
-
-                        // Oblong circle 3 - Diagonal lean
-                        Box(
-                            modifier = Modifier
-                                .width(330.dp)
-                                .height(280.dp)
-                                .rotate(rotation * 0.7f)
-                                .border(
-                                    width = 8.dp,
-                                    color = textColor.copy(alpha = 0.3f),
-                                    shape = RoundedCornerShape(50)
-                                )
-                        )
-
-                        // Oblong circle 4 - Opposite diagonal
-                        Box(
-                            modifier = Modifier
-                                .width(280.dp)
-                                .height(310.dp)
-                                .rotate(-rotation / 1.5f)
-                                .border(
-                                    width = 10.dp,
-                                    color = textColor.copy(alpha = 0.25f),
-                                    shape = RoundedCornerShape(50)
-                                )
-                        )
-
-                        // Perfect circle in the middle for contrast
-                        Box(
-                            modifier = Modifier
-                                .size(240.dp)
-                                .rotate(rotation * 2f)  // ← Faster rotation
+                                .size(280.dp)
+                                .rotate(-rotation / 2)
                                 .border(6.dp, textColor.copy(alpha = 0.2f), CircleShape)
                         )
 
-                        // Countdown numbers in center
+                        // Inner rotating ring
+                        Box(
+                            modifier = Modifier
+                                .size(240.dp)
+                                .rotate(rotation * 1.5f)
+                                .border(4.dp, textColor.copy(alpha = 0.15f), CircleShape)
+                        )
+
+                        // Countdown numbers
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(20.dp)
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
-                            // Days and Hours Row
+                            // Days and Hours
                             Row(
                                 horizontalArrangement = Arrangement.Center,
                                 verticalAlignment = Alignment.Top
                             ) {
-                                BigTimeUnit(
+                                AnimatedTimeUnit(
                                     value = String.format(Locale.US, "%02d", timeRemaining.days),
                                     label = "DAYS",
                                     color = textColor
@@ -252,26 +233,26 @@ fun CountdownTimerScreen(
 
                                 Text(
                                     text = ":",
-                                    fontSize = 72.sp,  // ← Slightly smaller to fit better
+                                    fontSize = 56.sp,
                                     fontWeight = FontWeight.Black,
                                     color = textColor,
                                     modifier = Modifier.padding(horizontal = 12.dp),
                                     fontFamily = FontFamily.Default
                                 )
 
-                                BigTimeUnit(
+                                AnimatedTimeUnit(
                                     value = String.format(Locale.US, "%02d", timeRemaining.hours),
                                     label = "HOURS",
                                     color = textColor
                                 )
                             }
 
-                            // Minutes and Seconds Row
+                            // Minutes and Seconds
                             Row(
                                 horizontalArrangement = Arrangement.Center,
                                 verticalAlignment = Alignment.Top
                             ) {
-                                BigTimeUnit(
+                                AnimatedTimeUnit(
                                     value = String.format(Locale.US, "%02d", timeRemaining.minutes),
                                     label = "MINS",
                                     color = textColor
@@ -279,14 +260,14 @@ fun CountdownTimerScreen(
 
                                 Text(
                                     text = ":",
-                                    fontSize = 72.sp,  // ← Slightly smaller
+                                    fontSize = 56.sp,
                                     fontWeight = FontWeight.Black,
                                     color = textColor,
                                     modifier = Modifier.padding(horizontal = 12.dp),
                                     fontFamily = FontFamily.Default
                                 )
 
-                                BigTimeUnit(
+                                AnimatedTimeUnit(
                                     value = String.format(Locale.US, "%02d", timeRemaining.seconds),
                                     label = "SECS",
                                     color = textColor
@@ -296,12 +277,9 @@ fun CountdownTimerScreen(
                     }
                 }
 
-                // Show "Event Passed" message if countdown is at 0
-                if (timeRemaining.days == 0 &&
-                    timeRemaining.hours == 0 &&
-                    timeRemaining.minutes == 0 &&
-                    timeRemaining.seconds == 0) {
-
+                // Event passed message
+                if (timeRemaining.days == 0 && timeRemaining.hours == 0 &&
+                    timeRemaining.minutes == 0 && timeRemaining.seconds == 0) {
                     Text(
                         text = "🎉 EVENT TIME! 🎉",
                         fontSize = 24.sp,
@@ -312,30 +290,27 @@ fun CountdownTimerScreen(
                     )
                 }
 
-                // Event Details Cards
+                // Modern Event Details Cards
                 Column(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    // Date & Time Card
-                    NeoInfoCard(
+                    ModernInfoCard(
                         icon = Icons.Default.CalendarToday,
                         title = "Date & Time",
                         content = event.dateTime,
                         textColor = textColor
                     )
 
-                    // Event Type Card
-                    NeoInfoCard(
+                    ModernInfoCard(
                         icon = Icons.AutoMirrored.Filled.Label,
                         title = "Event Type",
                         content = event.type.name,
                         textColor = textColor
                     )
 
-                    // Notes Card (if exists)
                     if (event.notes.isNotEmpty()) {
-                        NeoInfoCard(
+                        ModernInfoCard(
                             icon = Icons.AutoMirrored.Filled.Notes,
                             title = "Notes",
                             content = event.notes,
@@ -347,9 +322,8 @@ fun CountdownTimerScreen(
         }
     }
 
-    // Delete Confirmation Dialog
     if (showDeleteDialog) {
-        DeleteConfirmationDialog(
+        ModernDeleteDialog(
             eventTitle = event.title,
             onConfirm = {
                 showDeleteDialog = false
@@ -362,19 +336,16 @@ fun CountdownTimerScreen(
 }
 
 @Composable
-fun CountdownTopBar(
+fun ModernCountdownTopBar(
     onNavigateBack: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
-    backgroundColor: Color,
     textColor: Color
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(backgroundColor)
-            .statusBarsPadding()
-            .padding(horizontal = 8.dp, vertical = 12.dp),
+            .padding(horizontal = 4.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -388,21 +359,33 @@ fun CountdownTopBar(
         }
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            IconButton(onClick = onEdit) {
+            Surface(
+                onClick = onEdit,
+                shape = CircleShape,
+                color = Color.White.copy(alpha = 0.2f)
+            ) {
                 Icon(
                     imageVector = Icons.Default.Edit,
                     contentDescription = "Edit",
                     tint = textColor,
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier
+                        .padding(10.dp)
+                        .size(22.dp)
                 )
             }
 
-            IconButton(onClick = onDelete) {
+            Surface(
+                onClick = onDelete,
+                shape = CircleShape,
+                color = Color.White.copy(alpha = 0.2f)
+            ) {
                 Icon(
                     imageVector = Icons.Default.Delete,
                     contentDescription = "Delete",
                     tint = textColor,
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier
+                        .padding(10.dp)
+                        .size(22.dp)
                 )
             }
         }
@@ -410,75 +393,90 @@ fun CountdownTopBar(
 }
 
 @Composable
-fun BigTimeUnit(
+fun AnimatedTimeUnit(
     value: String,
     label: String,
     color: Color
 ) {
+    var previousValue by remember { mutableStateOf(value) }
+    val scale by animateFloatAsState(
+        targetValue = if (value != previousValue) 1.2f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessHigh
+        ),
+        label = "number_change"
+    )
+
+    LaunchedEffect(value) {
+        if (value != previousValue) {
+            kotlinx.coroutines.delay(150)
+            previousValue = value
+        }
+    }
+
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(6.dp)
+        verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         Text(
             text = value,
-            fontSize = 72.sp,  // ← Changed from 80sp to fit better
+            fontSize = 56.sp,
             fontWeight = FontWeight.Black,
             color = color,
-            lineHeight = 72.sp,
-            fontFamily = FontFamily.Default
+            lineHeight = 56.sp,
+            fontFamily = FontFamily.Default,
+            modifier = Modifier.graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
         )
         Text(
             text = label,
-            fontSize = 13.sp,
+            fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
             color = color.copy(alpha = 0.8f),
-            letterSpacing = 2.sp,
+            letterSpacing = 1.sp,
             fontFamily = FontFamily.Default
         )
     }
 }
 
 @Composable
-fun NeoInfoCard(
+fun ModernInfoCard(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     title: String,
     content: String,
     textColor: Color
 ) {
-    Box {
-        // Shadow
-        Box(
-            modifier = Modifier
-                .matchParentSize()
-                .offset(x = 4.dp, y = 4.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(Black)
-        )
-
-        // Card
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = Color.White.copy(alpha = 0.15f),
+        modifier = Modifier.fillMaxWidth()
+    ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
-                .background(White)
-                .border(3.dp, textColor, RoundedCornerShape(12.dp))
                 .padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(textColor.copy(alpha = 0.1f)),
-                contentAlignment = Alignment.Center
+            Surface(
+                shape = CircleShape,
+                color = Color.White.copy(alpha = 0.25f),
+                modifier = Modifier.size(44.dp)
             ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = textColor,
-                    modifier = Modifier.size(20.dp)
-                )
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = textColor,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
             }
 
             Column(modifier = Modifier.weight(1f)) {
@@ -486,13 +484,14 @@ fun NeoInfoCard(
                     text = title,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.Gray
+                    color = textColor.copy(alpha = 0.7f)
                 )
+                Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = content,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Black
+                    color = textColor
                 )
             }
         }
@@ -500,124 +499,92 @@ fun NeoInfoCard(
 }
 
 @Composable
-fun DeleteConfirmationDialog(
+fun ModernDeleteDialog(
     eventTitle: String,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    var visible by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(
+        targetValue = if (visible) 1f else 0.8f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+        label = "dialog_scale"
+    )
+
+    LaunchedEffect(Unit) {
+        visible = true
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = White,
-        title = {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+        shape = RoundedCornerShape(24.dp),
+        modifier = Modifier.graphicsLayer {
+            scaleX = scale
+            scaleY = scale
+        },
+        icon = {
+            Surface(
+                shape = CircleShape,
+                color = Color(0xFFFF5252).copy(alpha = 0.1f),
+                modifier = Modifier.size(64.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Default.Warning,
-                    contentDescription = null,
-                    tint = Color(0xFFFF5252),
-                    modifier = Modifier.size(28.dp)
-                )
-                Text(
-                    text = "Delete Event?",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Black
-                )
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Default.Warning,
+                        contentDescription = null,
+                        tint = Color(0xFFFF5252),
+                        modifier = Modifier.size(32.dp)
+                    )
+                }
             }
+        },
+        title = {
+            Text(
+                text = "Delete Event?",
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF1A1A1A),
+                textAlign = TextAlign.Center
+            )
         },
         text = {
             Text(
                 text = "Are you sure you want to delete \"$eventTitle\"? This action cannot be undone.",
-                fontSize = 16.sp,
-                color = Black
+                fontSize = 15.sp,
+                color = Color.Gray,
+                textAlign = TextAlign.Center
             )
         },
         confirmButton = {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.padding(bottom = 8.dp)
+            Surface(
+                onClick = onConfirm,
+                shape = RoundedCornerShape(12.dp),
+                color = Color(0xFFFF5252)
             ) {
-                // Cancel Button
-                Box {
-                    // Shadow
-                    Box(
-                        modifier = Modifier
-                            .matchParentSize()
-                            .offset(x = 4.dp, y = 4.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(Black)
-                    )
-
-                    // Button
-                    Button(
-                        onClick = onDismiss,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = White,
-                            contentColor = Black
-                        ),
-                        shape = RoundedCornerShape(12.dp),
-                        border = androidx.compose.foundation.BorderStroke(3.dp, Black),
-                        elevation = ButtonDefaults.buttonElevation(0.dp)
-                    ) {
-                        Text(
-                            text = "Cancel",
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 8.dp)
-                        )
-                    }
-                }
-
-                // Delete Button
-                Box {
-                    // Shadow
-                    Box(
-                        modifier = Modifier
-                            .matchParentSize()
-                            .offset(x = 4.dp, y = 4.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(Black)
-                    )
-
-                    // Button
-                    Button(
-                        onClick = onConfirm,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFFFF5252),
-                            contentColor = White
-                        ),
-                        shape = RoundedCornerShape(12.dp),
-                        border = androidx.compose.foundation.BorderStroke(3.dp, Black),
-                        elevation = ButtonDefaults.buttonElevation(0.dp)
-                    ) {
-                        Text(
-                            text = "Delete",
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 8.dp)
-                        )
-                    }
-                }
+                Text(
+                    text = "Delete",
+                    fontWeight = FontWeight.Bold,
+                    color = White,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
+                    fontSize = 15.sp
+                )
             }
         },
-        dismissButton = {}  // Empty since we're putting both buttons in confirmButton
+        dismissButton = {
+            Surface(
+                onClick = onDismiss,
+                shape = RoundedCornerShape(12.dp),
+                color = Color(0xFFF5F5F5)
+            ) {
+                Text(
+                    text = "Cancel",
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF1A1A1A),
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
+                    fontSize = 15.sp
+                )
+            }
+        }
     )
-}
-
-@Preview(showBackground = true, showSystemUi = true)
-@Composable
-fun CountdownTimerScreenPreview() {
-    EventifyTheme {
-        CountdownTimerScreen(
-            event = Event(
-                id = 1,
-                title = "Project Deadline",
-                type = EventType.ACADEMIC,
-                dateTime = "Due: Feb 25, 2024 at 11:59 PM",
-                countdownNumber = "5",
-                countdownLabel = "DAYS LEFT",
-                notes = "Submit final documentation and presentation slides."
-            )
-        )
-    }
 }

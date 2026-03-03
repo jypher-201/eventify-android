@@ -48,10 +48,7 @@ data class Event(
 )
 
 /**
- * Ultimate Glassmorphism Event Card
- * - RELIABLE smooth zoom animation
- * - Perfect rounded shadows
- * - Consistent press feedback
+ * Modern Glassmorphism Event Card - BIGGER TEXT VERSION
  */
 @Composable
 fun EventCard(
@@ -59,7 +56,6 @@ fun EventCard(
     modifier: Modifier = Modifier,
     onClick: () -> Unit = {}
 ) {
-    // Pre-compute colors
     val (backgroundColor, textColor, badgeColor) = remember(event.type) {
         when (event.type) {
             EventType.ACADEMIC -> Triple(
@@ -103,7 +99,7 @@ fun EventCard(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(82.dp)
+            .height(90.dp)  // ← Increased from 82dp for bigger text
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
@@ -138,7 +134,7 @@ fun EventCard(
                     .drawBehind {
                         drawRect(Color.White.copy(alpha = 0.1f))
                     }
-                    .padding(12.dp)
+                    .padding(14.dp)  // ← Increased from 12dp
             ) {
                 Row(
                     modifier = Modifier.fillMaxSize(),
@@ -147,7 +143,7 @@ fun EventCard(
                 ) {
                     Column(
                         modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                        verticalArrangement = Arrangement.spacedBy(8.dp)  // ← Increased from 6dp
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -156,7 +152,7 @@ fun EventCard(
                         ) {
                             Text(
                                 text = event.title,
-                                fontSize = 17.sp,  // ← INCREASED from 15sp
+                                fontSize = 18.sp,  // ← INCREASED from 17sp
                                 fontWeight = FontWeight.Bold,
                                 color = textColor,
                                 maxLines = 1,
@@ -164,7 +160,7 @@ fun EventCard(
                                 modifier = Modifier.weight(1f, fill = false)
                             )
 
-                            Spacer(modifier = Modifier.width(6.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
 
                             Box(
                                 modifier = Modifier
@@ -175,11 +171,11 @@ fun EventCard(
                                         color = textColor.copy(alpha = 0.5f),
                                         shape = RoundedCornerShape(10.dp)
                                     )
-                                    .padding(horizontal = 8.dp, vertical = 4.dp)  // ← Increased padding
+                                    .padding(horizontal = 9.dp, vertical = 5.dp)  // ← Increased
                             ) {
                                 Text(
                                     text = event.type.name,
-                                    fontSize = 9.sp,  // ← INCREASED from 8sp
+                                    fontSize = 10.sp,  // ← INCREASED from 9sp
                                     fontWeight = FontWeight.Black,
                                     color = badgeColor,
                                     letterSpacing = 0.5.sp
@@ -188,18 +184,18 @@ fun EventCard(
                         }
 
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy(5.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Schedule,
                                 contentDescription = null,
                                 tint = textColor.copy(alpha = 0.8f),
-                                modifier = Modifier.size(14.dp)  // ← INCREASED from 13dp
+                                modifier = Modifier.size(15.dp)  // ← INCREASED from 14dp
                             )
                             Text(
                                 text = event.dateTime,
-                                fontSize = 12.sp,  // ← INCREASED from 10sp
+                                fontSize = 13.sp,  // ← INCREASED from 12sp
                                 fontWeight = FontWeight.Medium,
                                 color = textColor.copy(alpha = 0.8f),
                                 maxLines = 1,
@@ -208,33 +204,35 @@ fun EventCard(
                         }
                     }
 
-                    Spacer(modifier = Modifier.width(10.dp))
+                    Spacer(modifier = Modifier.width(12.dp))
 
                     Box(
                         modifier = Modifier
-                            .size(54.dp)  // ← Slightly increased from 52dp
+                            .size(60.dp)  // ← INCREASED from 56dp
                             .clip(CircleShape)
                             .drawBehind {
                                 drawCircle(Color.White.copy(alpha = 0.25f))
                             }
-                            .border(2.dp, Color.White.copy(alpha = 0.5f), CircleShape),
+                            .border(2.5.dp, Color.White.copy(alpha = 0.5f), CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
                         Column(
-                            horizontalAlignment = Alignment.CenterHorizontally
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
                         ) {
                             Text(
                                 text = event.countdownNumber,
-                                fontSize = 21.sp,  // ← INCREASED from 19sp
+                                fontSize = 26.sp,  // ← INCREASED from 24sp
                                 fontWeight = FontWeight.Black,
-                                color = textColor
+                                color = textColor,
+                                lineHeight = 26.sp
                             )
                             Text(
                                 text = event.countdownLabel,
-                                fontSize = 8.sp,  // ← INCREASED from 7sp
+                                fontSize = 9.sp,  // ← INCREASED from 8.5sp
                                 fontWeight = FontWeight.Bold,
                                 color = textColor.copy(alpha = 0.8f),
-                                letterSpacing = 0.3.sp
+                                letterSpacing = 0.4.sp
                             )
                         }
                     }
