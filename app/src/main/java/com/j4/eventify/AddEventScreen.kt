@@ -5,6 +5,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -24,6 +25,8 @@ import androidx.compose.ui.unit.sp
 import com.j4.eventify.components.EventType
 import com.j4.eventify.ui.theme.*
 import androidx.compose.foundation.layout.statusBarsPadding
+import java.text.SimpleDateFormat
+import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -40,6 +43,27 @@ fun AddEventScreen(
     var endTime by remember { mutableStateOf("10:00 AM") }
     var notes by remember { mutableStateOf("") }
     var isAllDay by remember { mutableStateOf(false) }
+
+    // Dialog states
+    var showStartDatePicker by remember { mutableStateOf(false) }
+    var showEndDatePicker by remember { mutableStateOf(false) }
+    var showStartTimePicker by remember { mutableStateOf(false) }
+    var showEndTimePicker by remember { mutableStateOf(false) }
+
+    // Date picker states
+    val startDatePickerState = rememberDatePickerState()
+    val endDatePickerState = rememberDatePickerState()
+
+    // Time picker states
+    val startTimePickerState = rememberTimePickerState(initialHour = 9, initialMinute = 0)
+    val endTimePickerState = rememberTimePickerState(initialHour = 10, initialMinute = 0)
+
+    // Smart all-day logic: When toggled ON, set end date = start date
+    LaunchedEffect(isAllDay) {
+        if (isAllDay) {
+            endDate = startDate
+        }
+    }
 
     // Smooth entrance animation
     var visible by remember { mutableStateOf(false) }
@@ -85,48 +109,239 @@ fun AddEventScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 18.dp, vertical = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                // Title Input - Beautiful
+                // Title Input
                 UltimateTextField(
                     value = title,
                     onValueChange = { title = it },
-                    placeholder = "Event Title",
-                    icon = Icons.Default.Title,
-                    required = true
+                    placeholder = "Event Title *",
+                    icon = Icons.Default.Title
                 )
 
-                // Event Type - Modern Cards
+                // Event Type Selector
                 UltimateTypeSelector(
                     selectedType = selectedType,
                     onTypeSelected = { selectedType = it }
                 )
 
-                // Date & Time - Smart Layout
+                // Date & Time Section
                 UltimateDateTimeSection(
                     startDate = startDate,
                     endDate = endDate,
                     startTime = startTime,
                     endTime = endTime,
                     isAllDay = isAllDay,
-                    onStartDateClick = { /* TODO */ },
-                    onEndDateClick = { /* TODO */ },
-                    onStartTimeClick = { /* TODO */ },
-                    onEndTimeClick = { /* TODO */ },
+                    onStartDateClick = { showStartDatePicker = true },
+                    onEndDateClick = { showEndDatePicker = true },
+                    onStartTimeClick = { showStartTimePicker = true },
+                    onEndTimeClick = { showEndTimePicker = true },
                     onAllDayChange = { isAllDay = it }
                 )
 
-                // Notes - Expandable
+                // Notes Field
                 UltimateNotesField(
                     value = notes,
                     onValueChange = { notes = it }
                 )
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(12.dp))
             }
         }
     }
+
+    // Date Picker Dialogs
+    if (showStartDatePicker) {
+        ModernDatePickerDialog(
+            state = startDatePickerState,
+            onDismiss = { showStartDatePicker = false },
+            onConfirm = {
+                startDatePickerState.selectedDateMillis?.let { millis ->
+                    val formatter = SimpleDateFormat("MMM dd, yyyy", Locale.US)
+                    val newDate = formatter.format(Date(millis))
+                    startDate = newDate
+                    // Smart: if all-day, update end date too
+                    if (isAllDay) {
+                        endDate = newDate
+                    }
+                }
+                showStartDatePicker = false
+            }
+        )
+    }
+
+    if (showEndDatePicker) {
+        ModernDatePickerDialog(
+            state = endDatePickerState,
+            onDismiss = { showEndDatePicker = false },
+            onConfirm = {
+                endDatePickerState.selectedDateMillis?.let { millis ->
+                    val formatter = SimpleDateFormat("MMM dd, yyyy", Locale.US)
+                    endDate = formatter.format(Date(millis))
+                }
+                showEndDatePicker = false
+            }
+        )
+    }
+
+    // Time Picker Dialogs
+    if (showStartTimePicker) {
+        ModernTimePickerDialog(
+            state = startTimePickerState,
+            onDismiss = { showStartTimePicker = false },
+            onConfirm = {
+                val hour = startTimePickerState.hour
+                val minute = startTimePickerState.minute
+                startTime = formatTime(hour, minute)
+                showStartTimePicker = false
+            }
+        )
+    }
+
+    if (showEndTimePicker) {
+        ModernTimePickerDialog(
+            state = endTimePickerState,
+            onDismiss = { showEndTimePicker = false },
+            onConfirm = {
+                val hour = endTimePickerState.hour
+                val minute = endTimePickerState.minute
+                endTime = formatTime(hour, minute)
+                showEndTimePicker = false
+            }
+        )
+    }
+}
+
+// Helper function to format time
+fun formatTime(hour: Int, minute: Int): String {
+    val amPm = if (hour >= 12) "PM" else "AM"
+    val displayHour = when {
+        hour == 0 -> 12
+        hour > 12 -> hour - 12
+        else -> hour
+    }
+    return String.format("%d:%02d %s", displayHour, minute, amPm)
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ModernDatePickerDialog(
+    state: DatePickerState,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    DatePickerDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            Surface(
+                onClick = onConfirm,
+                shape = RoundedCornerShape(10.dp),
+                color = Color(0xFF667eea)
+            ) {
+                Text(
+                    "OK",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = White,
+                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp)
+                )
+            }
+        },
+        dismissButton = {
+            Surface(
+                onClick = onDismiss,
+                shape = RoundedCornerShape(10.dp),
+                color = Color(0xFFF5F5F5)
+            ) {
+                Text(
+                    "Cancel",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF1A1A1A),
+                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp)
+                )
+            }
+        },
+        colors = DatePickerDefaults.colors(
+            containerColor = White
+        ),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        DatePicker(
+            state = state,
+            colors = DatePickerDefaults.colors(
+                selectedDayContainerColor = Color(0xFF667eea),
+                todayContentColor = Color(0xFF667eea),
+                todayDateBorderColor = Color(0xFF667eea)
+            )
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ModernTimePickerDialog(
+    state: TimePickerState,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = White,
+        shape = RoundedCornerShape(16.dp),
+        title = {
+            Text(
+                "Select Time",
+                fontSize = 19.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF1A1A1A)
+            )
+        },
+        text = {
+            TimePicker(
+                state = state,
+                colors = TimePickerDefaults.colors(
+                    clockDialColor = Color(0xFFF5F5F5),
+                    selectorColor = Color(0xFF667eea),
+                    timeSelectorSelectedContainerColor = Color(0xFF667eea),
+                    timeSelectorUnselectedContainerColor = Color(0xFFF5F5F5),
+                    timeSelectorSelectedContentColor = White,
+                    timeSelectorUnselectedContentColor = Color(0xFF1A1A1A)
+                )
+            )
+        },
+        confirmButton = {
+            Surface(
+                onClick = onConfirm,
+                shape = RoundedCornerShape(10.dp),
+                color = Color(0xFF667eea)
+            ) {
+                Text(
+                    "OK",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = White,
+                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp)
+                )
+            }
+        },
+        dismissButton = {
+            Surface(
+                onClick = onDismiss,
+                shape = RoundedCornerShape(10.dp),
+                color = Color(0xFFF5F5F5)
+            ) {
+                Text(
+                    "Cancel",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF1A1A1A),
+                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp)
+                )
+            }
+        }
+    )
 }
 
 @Composable
@@ -140,24 +355,24 @@ fun UltimateTopBar(
             .fillMaxWidth()
             .statusBarsPadding(),
         color = White,
-        shadowElevation = 3.dp
+        shadowElevation = 2.dp
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 14.dp),
+                .padding(horizontal = 10.dp, vertical = 12.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(
                 onClick = onNavigateBack,
-                modifier = Modifier.size(44.dp)
+                modifier = Modifier.size(42.dp)
             ) {
                 Icon(
                     Icons.AutoMirrored.Filled.ArrowBack,
                     "Back",
                     tint = Color(0xFF1A1A1A),
-                    modifier = Modifier.size(26.dp)
+                    modifier = Modifier.size(25.dp)
                 )
             }
 
@@ -170,16 +385,16 @@ fun UltimateTopBar(
 
             Surface(
                 onClick = onSave,
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(11.dp),
                 color = if (canSave) Color(0xFF667eea) else Color(0xFFE0E0E0),
-                shadowElevation = if (canSave) 4.dp else 0.dp
+                shadowElevation = if (canSave) 3.dp else 0.dp
             ) {
                 Text(
                     "Save",
-                    fontSize = 15.sp,
+                    fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
                     color = if (canSave) White else Color.Gray,
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)
+                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 9.dp)
                 )
             }
         }
@@ -191,33 +406,32 @@ fun UltimateTextField(
     value: String,
     onValueChange: (String) -> Unit,
     placeholder: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    required: Boolean = false
+    icon: androidx.compose.ui.graphics.vector.ImageVector
 ) {
     Surface(
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(13.dp),
         color = White,
-        shadowElevation = 3.dp,
+        shadowElevation = 2.dp,
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(14.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Surface(
-                shape = RoundedCornerShape(10.dp),
+                shape = RoundedCornerShape(9.dp),
                 color = Color(0xFF667eea).copy(alpha = 0.12f),
-                modifier = Modifier.size(42.dp)
+                modifier = Modifier.size(38.dp)
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
                         icon,
                         null,
                         tint = Color(0xFF667eea),
-                        modifier = Modifier.size(22.dp)
+                        modifier = Modifier.size(21.dp)
                     )
                 }
             }
@@ -226,16 +440,11 @@ fun UltimateTextField(
                 value = value,
                 onValueChange = onValueChange,
                 placeholder = {
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(
-                            placeholder,
-                            color = Color.Gray,
-                            fontSize = 16.sp
-                        )
-                        if (required) {
-                            Text("*", color = Color(0xFFFF5252), fontSize = 16.sp)
-                        }
-                    }
+                    Text(
+                        placeholder,
+                        color = Color.Gray,
+                        fontSize = 17.sp
+                    )
                 },
                 colors = TextFieldDefaults.colors(
                     focusedContainerColor = Color.Transparent,
@@ -245,7 +454,7 @@ fun UltimateTextField(
                 ),
                 modifier = Modifier.weight(1f),
                 textStyle = androidx.compose.ui.text.TextStyle(
-                    fontSize = 16.sp,
+                    fontSize = 17.sp,
                     fontWeight = FontWeight.Medium,
                     color = Color(0xFF1A1A1A)
                 ),
@@ -260,50 +469,45 @@ fun UltimateTypeSelector(
     selectedType: EventType,
     onTypeSelected: (EventType) -> Unit
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text(
-            "Event Type",
-            fontSize = 15.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color(0xFF1A1A1A)
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        UltimateTypeChip(
+            text = "Academic",
+            icon = Icons.Default.School,
+            selected = selectedType == EventType.ACADEMIC,
+            onClick = { onTypeSelected(EventType.ACADEMIC) },
+            color = Color(0xFF667eea),
+            modifier = Modifier.weight(1f)
         )
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            UltimateTypeCard(
-                text = "Academic",
-                icon = Icons.Default.School,
-                selected = selectedType == EventType.ACADEMIC,
-                onClick = { onTypeSelected(EventType.ACADEMIC) },
-                color = Color(0xFF667eea),
-                modifier = Modifier.weight(1f)
-            )
+        UltimateTypeChip(
+            text = "Personal",
+            icon = Icons.Default.FitnessCenter,
+            selected = selectedType == EventType.PERSONAL,
+            onClick = { onTypeSelected(EventType.PERSONAL) },
+            color = Color(0xFFf093fb),
+            modifier = Modifier.weight(1f)
+        )
 
-            UltimateTypeCard(
-                text = "Personal",
-                icon = Icons.Default.FitnessCenter,
-                selected = selectedType == EventType.PERSONAL,
-                onClick = { onTypeSelected(EventType.PERSONAL) },
-                color = Color(0xFFf093fb),
-                modifier = Modifier.weight(1f)
-            )
+        UltimateTypeChip(
+            text = "Occasion",
+            icon = Icons.Default.Cake,
+            selected = selectedType == EventType.OCCASION,
+            onClick = { onTypeSelected(EventType.OCCASION) },
+            color = Color(0xFFfcb69f),
+            modifier = Modifier.weight(1f)
+        )
 
-            UltimateTypeCard(
-                text = "Occasion",
-                icon = Icons.Default.Cake,
-                selected = selectedType == EventType.OCCASION,
-                onClick = { onTypeSelected(EventType.OCCASION) },
-                color = Color(0xFFfcb69f),
-                modifier = Modifier.weight(1f)
-            )
-        }
+        AddTypeButton(
+            onClick = { /* TODO */ }
+        )
     }
 }
 
 @Composable
-fun UltimateTypeCard(
+fun UltimateTypeChip(
     text: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     selected: Boolean,
@@ -314,26 +518,26 @@ fun UltimateTypeCard(
     val scale by animateFloatAsState(
         targetValue = if (selected) 1.02f else 1f,
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
-        label = "card_scale"
+        label = "chip_scale"
     )
 
     Surface(
         onClick = onClick,
         modifier = modifier
-            .height(72.dp)
+            .height(54.dp)
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
             },
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(12.dp),
         color = if (selected) color else White,
-        shadowElevation = if (selected) 6.dp else 3.dp,
+        shadowElevation = if (selected) 5.dp else 2.dp,
         border = if (!selected) BorderStroke(1.5.dp, Color(0xFFE8E8E8)) else null
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(10.dp),
+                .padding(6.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
@@ -341,15 +545,54 @@ fun UltimateTypeCard(
                 icon,
                 null,
                 tint = if (selected) White else color,
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(20.dp)
             )
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(3.dp))
             Text(
                 text,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
                 color = if (selected) White else Color(0xFF1A1A1A)
             )
+        }
+    }
+}
+
+@Composable
+fun AddTypeButton(
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        modifier = Modifier
+            .width(54.dp)
+            .height(54.dp),
+        shape = RoundedCornerShape(12.dp),
+        color = White,
+        shadowElevation = 2.dp,
+        border = BorderStroke(1.5.dp, Color(0xFF667eea).copy(alpha = 0.5f))
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    Icons.Default.Add,
+                    "Add Type",
+                    tint = Color(0xFF667eea),
+                    modifier = Modifier.size(24.dp)
+                )
+                Text(
+                    "Add",
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF667eea)
+                )
+            }
         }
     }
 }
@@ -367,161 +610,156 @@ fun UltimateDateTimeSection(
     onEndTimeClick: () -> Unit,
     onAllDayChange: (Boolean) -> Unit
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text(
-            "Date & Time",
-            fontSize = 15.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color(0xFF1A1A1A)
-        )
-
-        Surface(
-            shape = RoundedCornerShape(14.dp),
-            color = White,
-            shadowElevation = 3.dp,
-            modifier = Modifier.fillMaxWidth()
+    Surface(
+        shape = RoundedCornerShape(13.dp),
+        color = White,
+        shadowElevation = 2.dp,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(0.dp)
         ) {
-            Column(
-                modifier = Modifier.padding(14.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+            // All-day Toggle
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                // Dates Row
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                Surface(
+                    shape = RoundedCornerShape(9.dp),
+                    color = Color(0xFF667eea).copy(alpha = 0.12f),
+                    modifier = Modifier.size(38.dp)
                 ) {
-                    UltimateDateTimeField(
-                        label = "Start Date",
-                        value = startDate,
-                        icon = Icons.Default.CalendarToday,
-                        onClick = onStartDateClick,
-                        modifier = Modifier.weight(1f)
-                    )
-
-                    UltimateDateTimeField(
-                        label = "End Date",
-                        value = endDate,
-                        icon = Icons.Default.Event,
-                        onClick = onEndDateClick,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-
-                // Times Row (only when not all-day)
-                if (!isAllDay) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        UltimateDateTimeField(
-                            label = "Start Time",
-                            value = startTime,
-                            icon = Icons.Default.Schedule,
-                            onClick = onStartTimeClick,
-                            modifier = Modifier.weight(1f)
-                        )
-
-                        UltimateDateTimeField(
-                            label = "End Time",
-                            value = endTime,
-                            icon = Icons.Default.AccessTime,
-                            onClick = onEndTimeClick,
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                }
-
-                // All-day Toggle
-                HorizontalDivider(color = Color(0xFFF0F0F0))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                    Box(contentAlignment = Alignment.Center) {
                         Icon(
-                            Icons.Default.WbSunny,
+                            Icons.Default.Schedule,
                             null,
                             tint = Color(0xFF667eea),
-                            modifier = Modifier.size(22.dp)
-                        )
-                        Text(
-                            "All-day event",
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = Color(0xFF1A1A1A)
+                            modifier = Modifier.size(20.dp)
                         )
                     }
-                    Switch(
-                        checked = isAllDay,
-                        onCheckedChange = onAllDayChange,
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = White,
-                            checkedTrackColor = Color(0xFF667eea),
-                            uncheckedThumbColor = White,
-                            uncheckedTrackColor = Color(0xFFE0E0E0)
-                        )
-                    )
                 }
+
+                Text(
+                    "All-day",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color(0xFF1A1A1A),
+                    modifier = Modifier.weight(1f)
+                )
+
+                Switch(
+                    checked = isAllDay,
+                    onCheckedChange = onAllDayChange,
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = White,
+                        checkedTrackColor = Color(0xFF667eea),
+                        uncheckedThumbColor = White,
+                        uncheckedTrackColor = Color(0xFFE0E0E0)
+                    )
+                )
             }
+
+            // Start Date & Time Row
+            UltimateDateTimeRow(
+                label = "Start",
+                date = startDate,
+                time = startTime,
+                showTime = !isAllDay,
+                onDateClick = onStartDateClick,
+                onTimeClick = onStartTimeClick
+            )
+
+            // End Date & Time Row
+            UltimateDateTimeRow(
+                label = "End",
+                date = endDate,
+                time = endTime,
+                showTime = !isAllDay,
+                onDateClick = onEndDateClick,
+                onTimeClick = onEndTimeClick
+            )
         }
     }
 }
 
 @Composable
-fun UltimateDateTimeField(
+fun UltimateDateTimeRow(
     label: String,
-    value: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    date: String,
+    time: String,
+    showTime: Boolean,
+    onDateClick: () -> Unit,
+    onTimeClick: () -> Unit
 ) {
-    Surface(
-        onClick = onClick,
-        shape = RoundedCornerShape(12.dp),
-        color = Color(0xFFF8F9FA),
-        modifier = modifier
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),  // ← REDUCED from 8dp to 4dp
+        verticalArrangement = Arrangement.spacedBy(4.dp)  // ← REDUCED from 5dp to 4dp
     ) {
+        // Label at top left
+        Text(
+            label,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium,
+            color = Color.Gray
+        )
+
+        // Date and Time row
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                icon,
-                null,
-                tint = Color(0xFF667eea),
-                modifier = Modifier.size(20.dp)
-            )
-
-            Column(modifier = Modifier.weight(1f)) {
+            // Date
+            Surface(
+                onClick = onDateClick,
+                color = Color.Transparent
+            ) {
                 Text(
-                    label,
-                    fontSize = 11.sp,
+                    date,
+                    fontSize = 16.sp,
                     fontWeight = FontWeight.Medium,
-                    color = Color.Gray
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    value,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
                     color = Color(0xFF1A1A1A)
                 )
             }
 
-            Icon(
-                Icons.Default.ChevronRight,
-                null,
-                tint = Color.Gray,
-                modifier = Modifier.size(18.dp)
-            )
+            // Time (if not all-day)
+            if (showTime) {
+                Surface(
+                    onClick = onTimeClick,
+                    color = Color.Transparent
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            time,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFF1A1A1A)
+                        )
+                        Icon(
+                            Icons.Default.ChevronRight,
+                            null,
+                            tint = Color.Gray,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+            } else {
+                Icon(
+                    Icons.Default.ChevronRight,
+                    null,
+                    tint = Color.Gray,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
         }
     }
 }
@@ -531,70 +769,61 @@ fun UltimateNotesField(
     value: String,
     onValueChange: (String) -> Unit
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text(
-            "Notes",
-            fontSize = 15.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color(0xFF1A1A1A)
-        )
-
-        Surface(
-            shape = RoundedCornerShape(14.dp),
-            color = White,
-            shadowElevation = 3.dp,
-            modifier = Modifier.fillMaxWidth()
+    Surface(
+        shape = RoundedCornerShape(13.dp),
+        color = White,
+        shadowElevation = 2.dp,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.Top
         ) {
-            Row(
+            Surface(
+                shape = RoundedCornerShape(9.dp),
+                color = Color(0xFF667eea).copy(alpha = 0.12f),
+                modifier = Modifier.size(38.dp)
+            ) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.padding(top = 2.dp)
+                ) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.Notes,
+                        null,
+                        tint = Color(0xFF667eea),
+                        modifier = Modifier.size(21.dp)
+                    )
+                }
+            }
+
+            TextField(
+                value = value,
+                onValueChange = onValueChange,
+                placeholder = {
+                    Text(
+                        "Add notes or location...",
+                        color = Color.Gray,
+                        fontSize = 16.sp
+                    )
+                },
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = Color.Transparent,
+                    unfocusedContainerColor = Color.Transparent,
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent
+                ),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.Top
-            ) {
-                Surface(
-                    shape = RoundedCornerShape(10.dp),
-                    color = Color(0xFF667eea).copy(alpha = 0.12f),
-                    modifier = Modifier.size(42.dp)
-                ) {
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier.padding(top = 2.dp)
-                    ) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.Notes,
-                            null,
-                            tint = Color(0xFF667eea),
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
-                }
-
-                TextField(
-                    value = value,
-                    onValueChange = onValueChange,
-                    placeholder = {
-                        Text(
-                            "Add location, details, or reminders...",
-                            color = Color.Gray,
-                            fontSize = 15.sp
-                        )
-                    },
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = Color.Transparent,
-                        unfocusedContainerColor = Color.Transparent,
-                        focusedIndicatorColor = Color.Transparent,
-                        unfocusedIndicatorColor = Color.Transparent
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 80.dp, max = 150.dp),
-                    textStyle = androidx.compose.ui.text.TextStyle(
-                        fontSize = 15.sp,
-                        color = Color(0xFF1A1A1A)
-                    )
+                    .heightIn(min = 70.dp, max = 130.dp),
+                textStyle = androidx.compose.ui.text.TextStyle(
+                    fontSize = 16.sp,
+                    color = Color(0xFF1A1A1A)
                 )
-            }
+            )
         }
     }
 }

@@ -8,6 +8,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Label
+import androidx.compose.material.icons.automirrored.filled.Notes
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -15,7 +17,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -28,9 +29,6 @@ import com.j4.eventify.components.Event
 import com.j4.eventify.components.EventType
 import com.j4.eventify.ui.theme.*
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.material.icons.automirrored.filled.Notes
-import androidx.compose.material.icons.automirrored.filled.Label
-import androidx.compose.runtime.LaunchedEffect
 import java.util.Locale
 
 data class TimeRemaining(
@@ -74,7 +72,6 @@ fun calculateTimeRemaining(countdownNumber: String): TimeRemaining {
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CountdownTimerScreen(
     event: Event,
@@ -131,192 +128,198 @@ fun CountdownTimerScreen(
         visible = true
     }
 
-    Scaffold(
-        containerColor = Color.Transparent
-    ) { paddingValues ->
-        Box(
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(backgroundColor)
+            .graphicsLayer { this.alpha = alpha }
+    ) {
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(backgroundColor)
-                .padding(paddingValues)
-                .graphicsLayer { this.alpha = alpha }
+                .padding(horizontal = 24.dp, vertical = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.SpaceBetween
         ) {
+            // Modern Top Bar - at the very top
+            ModernCountdownTopBar(
+                onNavigateBack = onNavigateBack,
+                onEdit = onEdit,
+                onDelete = { showDeleteDialog = true },
+                textColor = textColor
+            )
+
+            // Main Countdown with rotating circles
             Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .statusBarsPadding()
-                    .padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.SpaceBetween
+                verticalArrangement = Arrangement.spacedBy(32.dp),
+                modifier = Modifier
+                    .weight(1f)
+                    .wrapContentHeight(Alignment.CenterVertically)
             ) {
-                // Modern Top Bar
-                ModernCountdownTopBar(
-                    onNavigateBack = onNavigateBack,
-                    onEdit = onEdit,
-                    onDelete = { showDeleteDialog = true },
-                    textColor = textColor
+                // Event title
+                Text(
+                    text = event.title.uppercase(),
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.Black,
+                    color = textColor,
+                    textAlign = TextAlign.Center,
+                    maxLines = 2,
+                    letterSpacing = 1.5.sp,
+                    fontFamily = FontFamily.Default
                 )
 
-                // Main Countdown with rotating circles
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(32.dp),
+                // Decorative line
+                Box(
                     modifier = Modifier
-                        .weight(1f)
-                        .wrapContentHeight(Alignment.CenterVertically)
-                ) {
-                    // Event title
-                    Text(
-                        text = event.title.uppercase(),
-                        fontSize = 28.sp,
-                        fontWeight = FontWeight.Black,
-                        color = textColor,
-                        textAlign = TextAlign.Center,
-                        maxLines = 2,
-                        letterSpacing = 1.5.sp,
-                        fontFamily = FontFamily.Default
-                    )
+                        .width(150.dp)
+                        .height(4.dp)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(textColor)
+                )
 
-                    // Decorative line
+                // Rotating circles with countdown
+                Box(
+                    modifier = Modifier.size(340.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    // Outer rotating ring
                     Box(
                         modifier = Modifier
-                            .width(150.dp)
-                            .height(4.dp)
-                            .clip(RoundedCornerShape(2.dp))
-                            .background(textColor)
+                            .size(320.dp)
+                            .rotate(rotation)
+                            .border(
+                                8.dp,
+                                textColor.copy(alpha = if (event.type == EventType.PERSONAL) 0.5f else 0.3f),  // ← Darker for pink
+                                CircleShape
+                            )
                     )
 
-                    // Rotating circles with countdown
+                    // Middle rotating ring (opposite)
                     Box(
-                        modifier = Modifier.size(340.dp),
-                        contentAlignment = Alignment.Center
+                        modifier = Modifier
+                            .size(280.dp)
+                            .rotate(-rotation / 2)
+                            .border(
+                                6.dp,
+                                textColor.copy(alpha = if (event.type == EventType.PERSONAL) 0.4f else 0.2f),  // ← Darker for pink
+                                CircleShape
+                            )
+                    )
+
+                    // Inner rotating ring
+                    Box(
+                        modifier = Modifier
+                            .size(240.dp)
+                            .rotate(rotation * 1.5f)
+                            .border(
+                                4.dp,
+                                textColor.copy(alpha = if (event.type == EventType.PERSONAL) 0.3f else 0.15f),  // ← Darker for pink
+                                CircleShape
+                            )
+                    )
+
+                    // Countdown numbers
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        // Outer rotating ring
-                        Box(
-                            modifier = Modifier
-                                .size(320.dp)
-                                .rotate(rotation)
-                                .border(8.dp, textColor.copy(alpha = 0.3f), CircleShape)
-                        )
-
-                        // Middle rotating ring (opposite)
-                        Box(
-                            modifier = Modifier
-                                .size(280.dp)
-                                .rotate(-rotation / 2)
-                                .border(6.dp, textColor.copy(alpha = 0.2f), CircleShape)
-                        )
-
-                        // Inner rotating ring
-                        Box(
-                            modifier = Modifier
-                                .size(240.dp)
-                                .rotate(rotation * 1.5f)
-                                .border(4.dp, textColor.copy(alpha = 0.15f), CircleShape)
-                        )
-
-                        // Countdown numbers
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        // Days and Hours
+                        Row(
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.Top
                         ) {
-                            // Days and Hours
-                            Row(
-                                horizontalArrangement = Arrangement.Center,
-                                verticalAlignment = Alignment.Top
-                            ) {
-                                AnimatedTimeUnit(
-                                    value = String.format(Locale.US, "%02d", timeRemaining.days),
-                                    label = "DAYS",
-                                    color = textColor
-                                )
+                            AnimatedTimeUnit(
+                                value = String.format(Locale.US, "%02d", timeRemaining.days),
+                                label = "DAYS",
+                                color = textColor
+                            )
 
-                                Text(
-                                    text = ":",
-                                    fontSize = 56.sp,
-                                    fontWeight = FontWeight.Black,
-                                    color = textColor,
-                                    modifier = Modifier.padding(horizontal = 12.dp),
-                                    fontFamily = FontFamily.Default
-                                )
+                            Text(
+                                text = ":",
+                                fontSize = 56.sp,
+                                fontWeight = FontWeight.Black,
+                                color = textColor,
+                                modifier = Modifier.padding(horizontal = 12.dp),
+                                fontFamily = FontFamily.Default
+                            )
 
-                                AnimatedTimeUnit(
-                                    value = String.format(Locale.US, "%02d", timeRemaining.hours),
-                                    label = "HOURS",
-                                    color = textColor
-                                )
-                            }
+                            AnimatedTimeUnit(
+                                value = String.format(Locale.US, "%02d", timeRemaining.hours),
+                                label = "HOURS",
+                                color = textColor
+                            )
+                        }
 
-                            // Minutes and Seconds
-                            Row(
-                                horizontalArrangement = Arrangement.Center,
-                                verticalAlignment = Alignment.Top
-                            ) {
-                                AnimatedTimeUnit(
-                                    value = String.format(Locale.US, "%02d", timeRemaining.minutes),
-                                    label = "MINS",
-                                    color = textColor
-                                )
+                        // Minutes and Seconds
+                        Row(
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.Top
+                        ) {
+                            AnimatedTimeUnit(
+                                value = String.format(Locale.US, "%02d", timeRemaining.minutes),
+                                label = "MINS",
+                                color = textColor
+                            )
 
-                                Text(
-                                    text = ":",
-                                    fontSize = 56.sp,
-                                    fontWeight = FontWeight.Black,
-                                    color = textColor,
-                                    modifier = Modifier.padding(horizontal = 12.dp),
-                                    fontFamily = FontFamily.Default
-                                )
+                            Text(
+                                text = ":",
+                                fontSize = 56.sp,
+                                fontWeight = FontWeight.Black,
+                                color = textColor,
+                                modifier = Modifier.padding(horizontal = 12.dp),
+                                fontFamily = FontFamily.Default
+                            )
 
-                                AnimatedTimeUnit(
-                                    value = String.format(Locale.US, "%02d", timeRemaining.seconds),
-                                    label = "SECS",
-                                    color = textColor
-                                )
-                            }
+                            AnimatedTimeUnit(
+                                value = String.format(Locale.US, "%02d", timeRemaining.seconds),
+                                label = "SECS",
+                                color = textColor
+                            )
                         }
                     }
                 }
+            }
 
-                // Event passed message
-                if (timeRemaining.days == 0 && timeRemaining.hours == 0 &&
-                    timeRemaining.minutes == 0 && timeRemaining.seconds == 0) {
-                    Text(
-                        text = "🎉 EVENT TIME! 🎉",
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Black,
-                        color = textColor,
-                        modifier = Modifier.padding(vertical = 16.dp),
-                        textAlign = TextAlign.Center
-                    )
-                }
+            // Event passed message
+            if (timeRemaining.days == 0 && timeRemaining.hours == 0 &&
+                timeRemaining.minutes == 0 && timeRemaining.seconds == 0) {
+                Text(
+                    text = "🎉 EVENT TIME! 🎉",
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Black,
+                    color = textColor,
+                    modifier = Modifier.padding(vertical = 16.dp),
+                    textAlign = TextAlign.Center
+                )
+            }
 
-                // Modern Event Details Cards
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
+            // Modern Event Details Cards
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                ModernInfoCard(
+                    icon = Icons.Default.CalendarToday,
+                    title = "Date & Time",
+                    content = event.dateTime,
+                    textColor = textColor
+                )
+
+                ModernInfoCard(
+                    icon = Icons.AutoMirrored.Filled.Label,
+                    title = "Event Type",
+                    content = event.type.name,
+                    textColor = textColor
+                )
+
+                if (event.notes.isNotEmpty()) {
                     ModernInfoCard(
-                        icon = Icons.Default.CalendarToday,
-                        title = "Date & Time",
-                        content = event.dateTime,
+                        icon = Icons.AutoMirrored.Filled.Notes,
+                        title = "Notes",
+                        content = event.notes,
                         textColor = textColor
                     )
-
-                    ModernInfoCard(
-                        icon = Icons.AutoMirrored.Filled.Label,
-                        title = "Event Type",
-                        content = event.type.name,
-                        textColor = textColor
-                    )
-
-                    if (event.notes.isNotEmpty()) {
-                        ModernInfoCard(
-                            icon = Icons.AutoMirrored.Filled.Notes,
-                            title = "Notes",
-                            content = event.notes,
-                            textColor = textColor
-                        )
-                    }
                 }
             }
         }
@@ -345,20 +348,26 @@ fun ModernCountdownTopBar(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 4.dp, vertical = 8.dp),
+            .statusBarsPadding()
+            .padding(horizontal = 8.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        IconButton(onClick = onNavigateBack) {
+        // Back button - left edge
+        IconButton(
+            onClick = onNavigateBack,
+            modifier = Modifier.size(44.dp)
+        ) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                 contentDescription = "Back",
                 tint = textColor,
-                modifier = Modifier.size(28.dp)
+                modifier = Modifier.size(26.dp)
             )
         }
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        // Edit & Delete buttons - right edge
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             Surface(
                 onClick = onEdit,
                 shape = CircleShape,

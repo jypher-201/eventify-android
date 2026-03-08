@@ -1,10 +1,12 @@
 package com.j4.eventify
 
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -15,8 +17,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.focus.FocusRequester
@@ -56,6 +60,7 @@ fun HomeScreen(
     var timeFilter by remember { mutableStateOf(TimeFilter.ALL) }
     var showTimeFilterMenu by remember { mutableStateOf(false) }
     var selectedCalendarDate by remember { mutableStateOf<String?>(null) }
+    var showAboutDialog by remember { mutableStateOf(false) }
 
     // Optimized filtering with remember
     val filteredAndSortedEvents = remember(selectedFilter, searchQuery, timeFilter) {
@@ -100,6 +105,10 @@ fun HomeScreen(
                 selectedFilter = selectedFilter,
                 onFilterSelected = { filter ->
                     selectedFilter = filter
+                    scope.launch { drawerState.close() }
+                },
+                onAboutClick = {
+                    showAboutDialog = true
                     scope.launch { drawerState.close() }
                 }
             )
@@ -149,7 +158,7 @@ fun HomeScreen(
                                 LazyColumn(
                                     modifier = Modifier.fillMaxSize(),
                                     contentPadding = PaddingValues(16.dp),
-                                    verticalArrangement = Arrangement.spacedBy(8.dp)  // ← Changed from 12dp to 8dp
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     items(
                                         items = filteredAndSortedEvents,
@@ -178,6 +187,13 @@ fun HomeScreen(
             }
         }
     )
+
+    // About Dialog
+    if (showAboutDialog) {
+        ModernAboutDialog(
+            onDismiss = { showAboutDialog = false }
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -487,7 +503,8 @@ fun ModernTopBar(
 @Composable
 fun ModernDrawer(
     selectedFilter: EventType?,
-    onFilterSelected: (EventType?) -> Unit
+    onFilterSelected: (EventType?) -> Unit,
+    onAboutClick: () -> Unit
 ) {
     ModalDrawerSheet(
         drawerContainerColor = White,
@@ -552,7 +569,7 @@ fun ModernDrawer(
                 text = "About",
                 selected = false,
                 color = Color.Gray,
-                onClick = { /* TODO */ }
+                onClick = onAboutClick
             )
         }
     }
@@ -620,5 +637,155 @@ fun ModernEmptyState(message: String) {
                 color = Color.Gray
             )
         }
+    }
+}
+
+@Composable
+fun ModernAboutDialog(
+    onDismiss: () -> Unit
+) {
+    var visible by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(
+        targetValue = if (visible) 1f else 0.8f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+        label = "dialog_scale"
+    )
+
+    LaunchedEffect(Unit) {
+        visible = true
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = White,
+        shape = RoundedCornerShape(24.dp),
+        modifier = Modifier.graphicsLayer {
+            scaleX = scale
+            scaleY = scale
+        },
+        icon = {
+            Surface(
+                shape = CircleShape,
+                color = Color(0xFF667eea).copy(alpha = 0.15f),
+                modifier = Modifier.size(72.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(
+                        "📅",
+                        fontSize = 40.sp
+                    )
+                }
+            }
+        },
+        title = {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = "Eventify",
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Black,
+                    color = Color(0xFF1A1A1A)
+                )
+                Text(
+                    text = "Version 1.0",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color.Gray
+                )
+            }
+        },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "Your personal event countdown companion",
+                    fontSize = 15.sp,
+                    color = Color(0xFF1A1A1A),
+                    textAlign = TextAlign.Center,
+                    fontWeight = FontWeight.Medium
+                )
+
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    AboutInfoRow(
+                        icon = Icons.Default.Code,
+                        text = "Built with Jetpack Compose"
+                    )
+                    AboutInfoRow(
+                        icon = Icons.Default.Palette,
+                        text = "Modern Glassmorphism Design"
+                    )
+                    AboutInfoRow(
+                        icon = Icons.Default.Event,
+                        text = "Track Academic, Personal & Occasions"
+                    )
+                }
+
+                HorizontalDivider(color = Color(0xFFE8E8E8))
+
+                Text(
+                    text = "Made with ❤️ for managing your events",
+                    fontSize = 13.sp,
+                    color = Color.Gray,
+                    textAlign = TextAlign.Center,
+                    fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                )
+            }
+        },
+        confirmButton = {
+            Surface(
+                onClick = onDismiss,
+                shape = RoundedCornerShape(12.dp),
+                color = Color(0xFF667eea)
+            ) {
+                Text(
+                    text = "Got it!",
+                    fontWeight = FontWeight.Bold,
+                    color = White,
+                    modifier = Modifier.padding(horizontal = 32.dp, vertical = 12.dp),
+                    fontSize = 15.sp
+                )
+            }
+        }
+    )
+}
+
+@Composable
+fun AboutInfoRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    text: String
+) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Surface(
+            shape = CircleShape,
+            color = Color(0xFF667eea).copy(alpha = 0.1f),
+            modifier = Modifier.size(36.dp)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    icon,
+                    contentDescription = null,
+                    tint = Color(0xFF667eea),
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        }
+
+        Text(
+            text = text,
+            fontSize = 14.sp,
+            color = Color(0xFF1A1A1A),
+            fontWeight = FontWeight.Medium
+        )
     }
 }
