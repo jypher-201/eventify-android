@@ -190,7 +190,7 @@ fun CountdownTimerScreen(
                             .rotate(rotation)
                             .border(
                                 8.dp,
-                                textColor.copy(alpha = if (event.type == EventType.PERSONAL) 0.5f else 0.3f),  // ← Darker for pink
+                                textColor.copy(alpha = if (event.type == EventType.PERSONAL) 0.5f else 0.3f),
                                 CircleShape
                             )
                     )
@@ -202,7 +202,7 @@ fun CountdownTimerScreen(
                             .rotate(-rotation / 2)
                             .border(
                                 6.dp,
-                                textColor.copy(alpha = if (event.type == EventType.PERSONAL) 0.4f else 0.2f),  // ← Darker for pink
+                                textColor.copy(alpha = if (event.type == EventType.PERSONAL) 0.4f else 0.2f),
                                 CircleShape
                             )
                     )
@@ -214,68 +214,116 @@ fun CountdownTimerScreen(
                             .rotate(rotation * 1.5f)
                             .border(
                                 4.dp,
-                                textColor.copy(alpha = if (event.type == EventType.PERSONAL) 0.3f else 0.15f),  // ← Darker for pink
+                                textColor.copy(alpha = if (event.type == EventType.PERSONAL) 0.3f else 0.15f),
                                 CircleShape
                             )
                     )
 
-                    // Countdown numbers
+                    // Smart Countdown numbers - only show non-zero units
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                        verticalArrangement = Arrangement.spacedBy(20.dp)
                     ) {
-                        // Days and Hours
-                        Row(
-                            horizontalArrangement = Arrangement.Center,
-                            verticalAlignment = Alignment.Top
-                        ) {
-                            AnimatedTimeUnit(
-                                value = String.format(Locale.US, "%02d", timeRemaining.days),
-                                label = "DAYS",
-                                color = textColor
-                            )
+                        // Determine which units to show
+                        val showDays = timeRemaining.days > 0
+                        val showHours = timeRemaining.hours > 0 || showDays
+                        val showMinutes = timeRemaining.minutes > 0 || showHours
+                        val showSeconds = true // Always show seconds
 
-                            Text(
-                                text = ":",
-                                fontSize = 56.sp,
-                                fontWeight = FontWeight.Black,
-                                color = textColor,
-                                modifier = Modifier.padding(horizontal = 12.dp),
-                                fontFamily = FontFamily.Default
-                            )
+                        // Count active units for sizing
+                        val activeUnits = listOf(showDays, showHours, showMinutes, showSeconds).count { it }
 
-                            AnimatedTimeUnit(
-                                value = String.format(Locale.US, "%02d", timeRemaining.hours),
-                                label = "HOURS",
-                                color = textColor
-                            )
+                        // Dynamic font sizes based on active units
+                        val numberSize = when (activeUnits) {
+                            1 -> 72.sp  // Only seconds: HUGE
+                            2 -> 64.sp  // Two units: Very large
+                            3 -> 58.sp  // Three units: Large
+                            else -> 56.sp  // All four: Normal
                         }
 
-                        // Minutes and Seconds
-                        Row(
-                            horizontalArrangement = Arrangement.Center,
-                            verticalAlignment = Alignment.Top
-                        ) {
-                            AnimatedTimeUnit(
-                                value = String.format(Locale.US, "%02d", timeRemaining.minutes),
-                                label = "MINS",
-                                color = textColor
-                            )
+                        val labelSize = when (activeUnits) {
+                            1 -> 14.sp
+                            2 -> 12.sp
+                            3 -> 11.sp
+                            else -> 11.sp
+                        }
 
-                            Text(
-                                text = ":",
-                                fontSize = 56.sp,
-                                fontWeight = FontWeight.Black,
-                                color = textColor,
-                                modifier = Modifier.padding(horizontal = 12.dp),
-                                fontFamily = FontFamily.Default
-                            )
+                        // Row 1: Days and Hours (if needed)
+                        if (showDays || showHours) {
+                            Row(
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.Top
+                            ) {
+                                if (showDays) {
+                                    AnimatedTimeUnit(
+                                        value = String.format(Locale.US, "%02d", timeRemaining.days),
+                                        label = "DAYS",
+                                        color = textColor,
+                                        numberSize = numberSize,
+                                        labelSize = labelSize
+                                    )
 
-                            AnimatedTimeUnit(
-                                value = String.format(Locale.US, "%02d", timeRemaining.seconds),
-                                label = "SECS",
-                                color = textColor
-                            )
+                                    if (showHours) {
+                                        Text(
+                                            text = ":",
+                                            fontSize = numberSize,
+                                            fontWeight = FontWeight.Black,
+                                            color = textColor,
+                                            modifier = Modifier.padding(horizontal = 12.dp),
+                                            fontFamily = FontFamily.Default
+                                        )
+                                    }
+                                }
+
+                                if (showHours) {
+                                    AnimatedTimeUnit(
+                                        value = String.format(Locale.US, "%02d", timeRemaining.hours),
+                                        label = "HOURS",
+                                        color = textColor,
+                                        numberSize = numberSize,
+                                        labelSize = labelSize
+                                    )
+                                }
+                            }
+                        }
+
+                        // Row 2: Minutes and Seconds (if needed)
+                        if (showMinutes || showSeconds) {
+                            Row(
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.Top
+                            ) {
+                                if (showMinutes) {
+                                    AnimatedTimeUnit(
+                                        value = String.format(Locale.US, "%02d", timeRemaining.minutes),
+                                        label = "MINS",
+                                        color = textColor,
+                                        numberSize = numberSize,
+                                        labelSize = labelSize
+                                    )
+
+                                    if (showSeconds) {
+                                        Text(
+                                            text = ":",
+                                            fontSize = numberSize,
+                                            fontWeight = FontWeight.Black,
+                                            color = textColor,
+                                            modifier = Modifier.padding(horizontal = 12.dp),
+                                            fontFamily = FontFamily.Default
+                                        )
+                                    }
+                                }
+
+                                if (showSeconds) {
+                                    AnimatedTimeUnit(
+                                        value = String.format(Locale.US, "%02d", timeRemaining.seconds),
+                                        label = "SECS",
+                                        color = textColor,
+                                        numberSize = numberSize,
+                                        labelSize = labelSize
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -405,7 +453,9 @@ fun ModernCountdownTopBar(
 fun AnimatedTimeUnit(
     value: String,
     label: String,
-    color: Color
+    color: Color,
+    numberSize: androidx.compose.ui.unit.TextUnit = 56.sp,
+    labelSize: androidx.compose.ui.unit.TextUnit = 11.sp
 ) {
     var previousValue by remember { mutableStateOf(value) }
     val scale by animateFloatAsState(
@@ -430,10 +480,10 @@ fun AnimatedTimeUnit(
     ) {
         Text(
             text = value,
-            fontSize = 56.sp,
+            fontSize = numberSize,
             fontWeight = FontWeight.Black,
             color = color,
-            lineHeight = 56.sp,
+            lineHeight = numberSize,
             fontFamily = FontFamily.Default,
             modifier = Modifier.graphicsLayer {
                 scaleX = scale
@@ -442,7 +492,7 @@ fun AnimatedTimeUnit(
         )
         Text(
             text = label,
-            fontSize = 11.sp,
+            fontSize = labelSize,
             fontWeight = FontWeight.Bold,
             color = color.copy(alpha = 0.8f),
             letterSpacing = 1.sp,
