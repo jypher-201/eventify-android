@@ -6,7 +6,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -659,82 +658,110 @@ fun ModernAboutDialog(
         onDismissRequest = onDismiss,
         containerColor = White,
         shape = RoundedCornerShape(24.dp),
-        modifier = Modifier.graphicsLayer {
-            scaleX = scale
-            scaleY = scale
-        },
-        icon = {
-            Surface(
-                shape = CircleShape,
-                color = Color(0xFF667eea).copy(alpha = 0.15f),
-                modifier = Modifier.size(72.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Text(
-                        "📅",
-                        fontSize = 40.sp
-                    )
-                }
+        modifier = Modifier
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
             }
-        },
+            .fillMaxWidth(0.92f),
         title = {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth()  // ← Add this
             ) {
                 Text(
                     text = "Eventify",
-                    fontSize = 24.sp,
+                    fontSize = 28.sp,
                     fontWeight = FontWeight.Black,
-                    color = Color(0xFF1A1A1A)
+                    color = Color(0xFF1A1A1A),
+                    letterSpacing = 0.5.sp,
+                    textAlign = TextAlign.Center,  // ← Add this
+                    modifier = Modifier.fillMaxWidth()  // ← Add this
                 )
                 Text(
                     text = "Version 1.0",
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Medium,
-                    color = Color.Gray
+                    color = Color.Gray,
+                    textAlign = TextAlign.Center,  // ← Add this
+                    modifier = Modifier.fillMaxWidth()  // ← Add this
                 )
+
+                // Group Name with Math Notation
+                Row(
+                    horizontalArrangement = Arrangement.Center,  // ← CHANGED from spacedBy
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "by J",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF667eea)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))  // ← ADD spacing between texts
+                    Text(
+                        text = "⁴",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF667eea),
+                        modifier = Modifier.offset(y = (-3).dp)
+                    )
+                }
             }
         },
         text = {
             Column(
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(18.dp)
             ) {
+                // App Description
                 Text(
-                    text = "Your personal event countdown companion",
+                    text = "Your ultimate personal countdown companion for tracking life's important moments",
                     fontSize = 15.sp,
                     color = Color(0xFF1A1A1A),
                     textAlign = TextAlign.Center,
-                    fontWeight = FontWeight.Medium
+                    fontWeight = FontWeight.Medium,
+                    lineHeight = 22.sp,
+                    modifier = Modifier.fillMaxWidth()
                 )
 
+                HorizontalDivider(color = Color(0xFFE8E8E8))
+
+                // What It Does Section
                 Column(
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    AboutInfoRow(
-                        icon = Icons.Default.Code,
-                        text = "Built with Jetpack Compose"
+                    Text(
+                        "What Eventify Does:",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF667eea),
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
                     )
-                    AboutInfoRow(
-                        icon = Icons.Default.Palette,
-                        text = "Modern Glassmorphism Design"
-                    )
-                    AboutInfoRow(
-                        icon = Icons.Default.Event,
-                        text = "Track Academic, Personal & Occasions"
+                    Text(
+                        "Never miss important dates! Track academic deadlines, personal milestones, and special occasions all in one beautiful app with customizable event types, live countdown timers, and smart filtering.",
+                        fontSize = 14.sp,
+                        color = Color(0xFF1A1A1A),
+                        lineHeight = 21.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
                     )
                 }
 
                 HorizontalDivider(color = Color(0xFFE8E8E8))
 
+                // Footer
                 Text(
-                    text = "Made with ❤️ for managing your events",
+                    text = "© 2024 J⁴ Team",
                     fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
                     color = Color.Gray,
                     textAlign = TextAlign.Center,
-                    fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
         },
@@ -754,38 +781,4 @@ fun ModernAboutDialog(
             }
         }
     )
-}
-
-@Composable
-fun AboutInfoRow(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    text: String
-) {
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Surface(
-            shape = CircleShape,
-            color = Color(0xFF667eea).copy(alpha = 0.1f),
-            modifier = Modifier.size(36.dp)
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    icon,
-                    contentDescription = null,
-                    tint = Color(0xFF667eea),
-                    modifier = Modifier.size(18.dp)
-                )
-            }
-        }
-
-        Text(
-            text = text,
-            fontSize = 14.sp,
-            color = Color(0xFF1A1A1A),
-            fontWeight = FontWeight.Medium
-        )
-    }
 }
