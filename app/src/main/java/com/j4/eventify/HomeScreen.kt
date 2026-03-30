@@ -756,7 +756,7 @@ fun ModernAboutDialog(
 
                 // Footer
                 Text(
-                    text = "© 2024 J⁴ Team",
+                    text = "©2026 J⁴ Team",
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Medium,
                     color = Color.Gray,

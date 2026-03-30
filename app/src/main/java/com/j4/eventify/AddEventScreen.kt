@@ -5,7 +5,6 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -28,6 +27,12 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import java.text.SimpleDateFormat
 import java.util.*
 
+// Reminder data class
+data class ReminderOption(
+    val label: String,
+    val value: String  // e.g., "15m", "1h", "1d", "1w", "at_time"
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddEventScreen(
@@ -43,6 +48,10 @@ fun AddEventScreen(
     var endTime by remember { mutableStateOf("10:00 AM") }
     var notes by remember { mutableStateOf("") }
     var isAllDay by remember { mutableStateOf(false) }
+
+    // REMINDER STATES
+    var selectedReminders by remember { mutableStateOf(listOf<String>()) }  // List of selected reminder values
+    var showReminderMenu by remember { mutableStateOf(false) }
 
     // Dialog states
     var showStartDatePicker by remember { mutableStateOf(false) }
@@ -140,6 +149,15 @@ fun AddEventScreen(
                     onAllDayChange = { isAllDay = it }
                 )
 
+                // REMINDER SECTION (NEW!)
+                ReminderSection(
+                    selectedReminders = selectedReminders,
+                    onAddReminderClick = { showReminderMenu = true },
+                    onRemoveReminder = { reminderValue ->
+                        selectedReminders = selectedReminders.filter { it != reminderValue }
+                    }
+                )
+
                 // Notes Field
                 UltimateNotesField(
                     value = notes,
@@ -149,6 +167,20 @@ fun AddEventScreen(
                 Spacer(modifier = Modifier.height(12.dp))
             }
         }
+    }
+
+    // REMINDER MENU DIALOG (NEW!)
+    if (showReminderMenu) {
+        ReminderMenuDialog(
+            selectedReminders = selectedReminders,
+            onDismiss = { showReminderMenu = false },
+            onReminderSelected = { reminderValue ->
+                if (!selectedReminders.contains(reminderValue)) {
+                    selectedReminders = selectedReminders + reminderValue
+                }
+                showReminderMenu = false
+            }
+        )
     }
 
     // Date Picker Dialogs
@@ -210,6 +242,259 @@ fun AddEventScreen(
                 showEndTimePicker = false
             }
         )
+    }
+}
+
+// NEW COMPONENT: Reminder Section
+@Composable
+fun ReminderSection(
+    selectedReminders: List<String>,
+    onAddReminderClick: () -> Unit,
+    onRemoveReminder: (String) -> Unit
+) {
+    Surface(
+        shape = RoundedCornerShape(13.dp),
+        color = White,
+        shadowElevation = 2.dp,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // Header with icon and "Add Reminder" button
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(9.dp),
+                    color = Color(0xFF667eea).copy(alpha = 0.12f),
+                    modifier = Modifier.size(38.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            Icons.Default.Notifications,
+                            null,
+                            tint = Color(0xFF667eea),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+
+                Text(
+                    "Reminders",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color(0xFF1A1A1A),
+                    modifier = Modifier.weight(1f)
+                )
+
+                Surface(
+                    onClick = onAddReminderClick,
+                    shape = RoundedCornerShape(8.dp),
+                    color = Color(0xFF667eea).copy(alpha = 0.1f)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.Add,
+                            null,
+                            tint = Color(0xFF667eea),
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            "Add",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF667eea)
+                        )
+                    }
+                }
+            }
+
+            // Display selected reminders
+            if (selectedReminders.isNotEmpty()) {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    selectedReminders.forEach { reminderValue ->
+                        ReminderChip(
+                            label = getReminderLabel(reminderValue),
+                            onRemove = { onRemoveReminder(reminderValue) }
+                        )
+                    }
+                }
+            } else {
+                // Empty state
+                Text(
+                    "No reminders set",
+                    fontSize = 14.sp,
+                    color = Color.Gray,
+                    modifier = Modifier.padding(start = 50.dp, top = 4.dp)
+                )
+            }
+        }
+    }
+}
+
+// NEW COMPONENT: Individual Reminder Chip
+@Composable
+fun ReminderChip(
+    label: String,
+    onRemove: () -> Unit
+) {
+    Surface(
+        shape = RoundedCornerShape(10.dp),
+        color = Color(0xFFF5F5F5),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    Icons.Default.NotificationsActive,
+                    null,
+                    tint = Color(0xFF667eea),
+                    modifier = Modifier.size(18.dp)
+                )
+                Text(
+                    label,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color(0xFF1A1A1A)
+                )
+            }
+
+            IconButton(
+                onClick = onRemove,
+                modifier = Modifier.size(28.dp)
+            ) {
+                Icon(
+                    Icons.Default.Close,
+                    "Remove",
+                    tint = Color.Gray,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        }
+    }
+}
+
+// NEW COMPONENT: Reminder Menu Dialog
+@Composable
+fun ReminderMenuDialog(
+    selectedReminders: List<String>,
+    onDismiss: () -> Unit,
+    onReminderSelected: (String) -> Unit
+) {
+    val reminderOptions = listOf(
+        ReminderOption("At time of event", "at_time"),
+        ReminderOption("5 minutes before", "5m"),
+        ReminderOption("15 minutes before", "15m"),
+        ReminderOption("30 minutes before", "30m"),
+        ReminderOption("1 hour before", "1h"),
+        ReminderOption("2 hours before", "2h"),
+        ReminderOption("1 day before", "1d"),
+        ReminderOption("2 days before", "2d"),
+        ReminderOption("1 week before", "1w")
+    )
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = White,
+        shape = RoundedCornerShape(16.dp),
+        title = {
+            Text(
+                "Add Reminder",
+                fontSize = 19.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF1A1A1A)
+            )
+        },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                reminderOptions.forEach { option ->
+                    val isSelected = selectedReminders.contains(option.value)
+
+                    Surface(
+                        onClick = { onReminderSelected(option.value) },
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (isSelected) Color(0xFF667eea).copy(alpha = 0.1f) else Color.Transparent,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                option.label,
+                                fontSize = 15.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isSelected) Color(0xFF667eea) else Color(0xFF1A1A1A)
+                            )
+
+                            if (isSelected) {
+                                Icon(
+                                    Icons.Default.Check,
+                                    null,
+                                    tint = Color(0xFF667eea),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Surface(
+                onClick = onDismiss,
+                shape = RoundedCornerShape(10.dp),
+                color = Color(0xFF667eea)
+            ) {
+                Text(
+                    "Done",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = White,
+                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp)
+                )
+            }
+        }
+    )
+}
+
+// Helper function to get reminder label from value
+fun getReminderLabel(value: String): String {
+    return when (value) {
+        "at_time" -> "At time of event"
+        "5m" -> "5 minutes before"
+        "15m" -> "15 minutes before"
+        "30m" -> "30 minutes before"
+        "1h" -> "1 hour before"
+        "2h" -> "2 hours before"
+        "1d" -> "1 day before"
+        "2d" -> "2 days before"
+        "1w" -> "1 week before"
+        else -> value
     }
 }
 
