@@ -57,7 +57,11 @@ fun CalendarView(
     events: List<Event>,
     onEventClick: (Int) -> Unit,
     onDateSelected: (String) -> Unit = {},
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    // Add theme parameters
+    accentColor: Color = Color(0xFF667eea),
+    textColor: Color = Color(0xFF1A1A1A),
+    surfaceColor: Color = Color.White
 ) {
     val philippinesZone = java.util.TimeZone.getTimeZone("Asia/Manila")
     val today = Calendar.getInstance(philippinesZone)
@@ -88,15 +92,18 @@ fun CalendarView(
         onDateSelected(formattedDate)
     }
 
+    // Dynamic background for the empty state or list area
+    val screenBg = if (textColor == Color.White) Color(0xFF1A1A1A) else Color(0xFFFAFAFA)
+
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFFFAFAFA))
+            .background(screenBg) // Dynamic background
     ) {
         // Modern Calendar Header
         Surface(
             modifier = Modifier.fillMaxWidth(),
-            color = White,
+            color = surfaceColor, // Dynamic Surface
             shadowElevation = 2.dp
         ) {
             Column(
@@ -123,7 +130,7 @@ fun CalendarView(
                         Icon(
                             Icons.AutoMirrored.Filled.KeyboardArrowLeft,
                             "Previous Month",
-                            tint = Color(0xFF667eea),
+                            tint = accentColor, // Dynamic Accent
                             modifier = Modifier.size(28.dp)
                         )
                     }
@@ -132,7 +139,7 @@ fun CalendarView(
                         text = "${monthNames[currentMonth]} $currentYear",
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF1A1A1A)
+                        color = textColor // Dynamic Text
                     )
 
                     IconButton(
@@ -148,7 +155,7 @@ fun CalendarView(
                         Icon(
                             Icons.AutoMirrored.Filled.KeyboardArrowRight,
                             "Next Month",
-                            tint = Color(0xFF667eea),
+                            tint = accentColor, // Dynamic Accent
                             modifier = Modifier.size(28.dp)
                         )
                     }
@@ -168,27 +175,27 @@ fun CalendarView(
                             textAlign = TextAlign.Center,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color.Gray
+                            color = textColor.copy(alpha = 0.5f) // Dynamic Muted Text
                         )
                     }
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Calendar Grid - TIGHTER SPACING
+                // Calendar Grid
                 val cal = Calendar.getInstance(philippinesZone)
                 cal.set(currentYear, currentMonth, 1)
                 val firstDayOfWeek = cal.get(Calendar.DAY_OF_WEEK) - 1
                 val daysInMonth = cal.getActualMaximum(Calendar.DAY_OF_MONTH)
 
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {  // ← Reduced from 8dp to 4dp
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     var dayCounter = 1
                     for (week in 0..5) {
                         if (dayCounter > daysInMonth) break
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)  // ← Added horizontal spacing
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             for (dayOfWeek in 0..6) {
                                 val shouldShowDay = if (week == 0) {
@@ -213,7 +220,9 @@ fun CalendarView(
                                         isSelected = currentDay == selectedDay,
                                         events = eventsOnDay,
                                         onClick = { selectedDay = currentDay },
-                                        modifier = Modifier.weight(1f)
+                                        modifier = Modifier.weight(1f),
+                                        accentColor = accentColor, // Pass theme
+                                        textColor = textColor
                                     )
                                     dayCounter++
                                 } else {
@@ -232,7 +241,7 @@ fun CalendarView(
                 text = "Events on ${monthNames[currentMonth]} $selectedDay",
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFF1A1A1A),
+                color = textColor, // Dynamic Text
                 modifier = Modifier.padding(16.dp)
             )
 
@@ -262,9 +271,97 @@ fun CalendarView(
                         "No events on this day",
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Medium,
-                        color = Color.Gray
+                        color = textColor.copy(alpha = 0.5f) // Dynamic Muted Text
                     )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+fun ModernDayCell(
+    day: Int,
+    isToday: Boolean,
+    isSelected: Boolean,
+    events: List<CalendarEvent>,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    accentColor: Color,
+    textColor: Color
+) {
+    Box(
+        modifier = modifier
+            .aspectRatio(1f)
+            .clip(RoundedCornerShape(12.dp))
+            .background(
+                when {
+                    isSelected -> accentColor.copy(alpha = 0.15f) // Dynamic selected bg
+                    isToday -> accentColor.copy(alpha = 0.08f) // Dynamic today bg
+                    else -> Color.Transparent
+                }
+            )
+            .border(
+                width = if (isSelected) 2.dp else 0.dp,
+                color = accentColor, // Dynamic border
+                shape = RoundedCornerShape(12.dp)
+            )
+            .clickable(onClick = onClick)
+            .padding(4.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.fillMaxHeight()
+        ) {
+            Spacer(modifier = Modifier.height(2.dp))
+
+            Text(
+                text = day.toString(),
+                fontSize = 14.sp,
+                fontWeight = if (isToday || isSelected) FontWeight.Bold else FontWeight.Normal,
+                color = when {
+                    isSelected -> accentColor // Dynamic
+                    else -> textColor // Dynamic
+                }
+            )
+
+            if (events.isNotEmpty()) {
+                val barColor = when (events.size) {
+                    1 -> {
+                        when (events[0].event.type) {
+                            EventType.ACADEMIC -> Color(0xFF667eea)
+                            EventType.PERSONAL -> Color(0xFFf093fb)
+                            EventType.OCCASION -> Color(0xFFfcb69f)
+                        }
+                    }
+                    else -> accentColor // Fallback to accent for multiple
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(0.75f),
+                    horizontalArrangement = Arrangement.spacedBy(1.dp)
+                ) {
+                    val displayCount = if (events.size > 3) 3 else events.size
+                    events.take(displayCount).forEach { calEvent ->
+                        val color = when (calEvent.event.type) {
+                            EventType.ACADEMIC -> Color(0xFF667eea)
+                            EventType.PERSONAL -> Color(0xFFf093fb)
+                            EventType.OCCASION -> Color(0xFFfcb69f)
+                        }
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(3.dp)
+                                .clip(RoundedCornerShape(2.dp))
+                                .background(color)
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(2.dp))
+            } else {
+                Spacer(modifier = Modifier.height(7.dp))
             }
         }
     }

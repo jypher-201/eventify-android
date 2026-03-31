@@ -13,7 +13,7 @@ object DummyData {
             id = 1,
             title = "Project Deadline",
             type = EventType.ACADEMIC,
-            dateTime = "Due: Feb 25, 2024",
+            dateTime = "Due: April 25, 2026",
             countdownNumber = "5",
             countdownLabel = "DAYS LEFT",
             notes = "Submit final documentation and presentation slides."
@@ -40,7 +40,7 @@ object DummyData {
             id = 4,
             title = "Final Exam - Mobile Dev",
             type = EventType.ACADEMIC,
-            dateTime = "Due: Mar 8, 2024",
+            dateTime = "Due: April 8, 2026",
             countdownNumber = "12",
             countdownLabel = "DAYS LEFT",
             notes = "Study chapters 5-10. Focus on Jetpack Compose."
@@ -49,7 +49,7 @@ object DummyData {
             id = 5,
             title = "Concert - Ben&Ben",
             type = EventType.PERSONAL,
-            dateTime = "Mar 15, 2024",
+            dateTime = "April 15, 2026",
             countdownNumber = "19",
             countdownLabel = "DAYS LEFT",
             notes = "Gates open at 6 PM. Bring valid ID."

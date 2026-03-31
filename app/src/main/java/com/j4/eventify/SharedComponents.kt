@@ -29,11 +29,14 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun EventifyFAB(
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    backgroundColor: Color = Color(0xFF667eea) // Add this parameter
 ) {
     var isPressed by remember { mutableStateOf(false) }
 
-    // Smooth scale animation
+    // Logic for a darker version of the accent color for the gradient
+    val secondaryColor = backgroundColor.copy(alpha = 0.8f)
+
     val scale by animateFloatAsState(
         targetValue = if (isPressed) 0.88f else 1f,
         animationSpec = spring(
@@ -43,7 +46,6 @@ fun EventifyFAB(
         label = "fab_scale"
     )
 
-    // Smooth shadow animation
     val shadowElevation by animateDpAsState(
         targetValue = if (isPressed) 4.dp else 16.dp,
         animationSpec = spring(
@@ -62,7 +64,6 @@ fun EventifyFAB(
                 scaleY = scale
             }
     ) {
-        // Shadow layer
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -75,8 +76,8 @@ fun EventifyFAB(
                 .background(
                     Brush.linearGradient(
                         colors = listOf(
-                            Color(0xFF667eea),  // Purple
-                            Color(0xFF764ba2)   // Deep purple
+                            backgroundColor, // Use the passed accent color
+                            secondaryColor   // Use the slightly darker version
                         )
                     )
                 )
@@ -84,9 +85,7 @@ fun EventifyFAB(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null
                 ) {
-                    isPressed = true
                     onClick()
-                    isPressed = false
                 }
         ) {
             // Glassmorphism overlay
