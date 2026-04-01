@@ -100,8 +100,10 @@ fun getTopBarContentColor(theme: AppTheme): Color = when (theme) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
-    onNavigateToAddEvent: (String?) -> Unit = { _ -> },
-    onNavigateToEventDetails: (Int) -> Unit = {}
+    onNavigateToAddEvent: (String?, AppTheme) -> Unit = { _, _ -> },
+    onNavigateToEventDetails: (Int) -> Unit = {},
+    currentTheme: AppTheme = AppTheme.DEFAULT,
+    onThemeChange: (AppTheme) -> Unit = {}
 ) {
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -114,8 +116,6 @@ fun HomeScreen(
     var selectedCalendarDate by remember { mutableStateOf<String?>(null) }
     var showAboutDialog      by remember { mutableStateOf(false) }
     var showCustomTypeDialog by remember { mutableStateOf(false) }
-    var currentTheme         by remember { mutableStateOf(AppTheme.DEFAULT) }
-
     val backgroundColor    = getBackgroundColor(currentTheme)
     val accentColor        = getAccentColor(currentTheme)
     val textColor          = getTextColor(currentTheme)
@@ -157,7 +157,7 @@ fun HomeScreen(
                     scope.launch { drawerState.close() }
                 },
                 currentTheme     = currentTheme,
-                onThemeSelected  = { currentTheme = it },
+                onThemeSelected  = { onThemeChange(it) },
                 onAboutClick     = {
                     showAboutDialog = true
                     scope.launch { drawerState.close() }
@@ -193,15 +193,6 @@ fun HomeScreen(
                         currentTheme       = currentTheme
                     )
                 },
-                floatingActionButton = {
-                    EventifyFAB(
-                        onClick = {
-                            val dateToPass = if (viewMode == ViewMode.CALENDAR) selectedCalendarDate else null
-                            onNavigateToAddEvent(dateToPass)
-                        },
-                        backgroundColor = accentColor
-                    )
-                }
             ) { paddingValues ->
                 Box(
                     modifier = Modifier
@@ -242,6 +233,17 @@ fun HomeScreen(
                             }
                         }
                     }
+
+                    // FAB overlaid directly — avoids Scaffold wrapping it in its own
+                    // FloatingActionButton container which adds an unwanted tonal circle
+                    EventifyFAB(
+                        onClick = {
+                            val dateToPass = if (viewMode == ViewMode.CALENDAR) selectedCalendarDate else null
+                            onNavigateToAddEvent(dateToPass, currentTheme)
+                        },
+                        backgroundColor = accentColor,
+                        modifier = Modifier.align(Alignment.BottomEnd)
+                    )
                 }
             }
         }

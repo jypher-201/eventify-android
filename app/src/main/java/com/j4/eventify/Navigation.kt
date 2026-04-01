@@ -1,43 +1,45 @@
 package com.j4.eventify
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 
-/**
- * Navigation routes for the app
- */
 object Routes {
-    const val HOME = "home"
-    const val ADD_EVENT = "add_event"
+    const val HOME          = "home"
+    const val ADD_EVENT     = "add_event"
     const val EVENT_DETAILS = "event_details"
 
     fun eventDetails(eventId: Int) = "event_details/$eventId"
 }
 
-/**
- * Main navigation setup for the app
- */
 @Composable
 fun EventifyNavigation() {
     val navController = rememberNavController()
 
+    // rememberSaveable survives back-stack pops AND config changes.
+    // Stored as Int (ordinal) because enums aren't directly saveable.
+    var themeOrdinal by rememberSaveable { mutableStateOf(AppTheme.DEFAULT.ordinal) }
+    val currentTheme = AppTheme.entries[themeOrdinal]
+
     NavHost(
-        navController = navController,
+        navController    = navController,
         startDestination = Routes.HOME
     ) {
-        // Home Screen
+        // ── Home ──────────────────────────────────────────────
         composable(route = Routes.HOME) {
             HomeScreen(
-                onNavigateToAddEvent = { selectedDate ->
-                    if (selectedDate != null) {
-                        navController.currentBackStackEntry
-                            ?.savedStateHandle
-                            ?.set("selectedDate", selectedDate)
-                    }
+                currentTheme             = currentTheme,
+                onThemeChange            = { themeOrdinal = it.ordinal },
+                onNavigateToAddEvent     = { selectedDate, _ ->
+                    val handle = navController.currentBackStackEntry?.savedStateHandle
+                    if (selectedDate != null) handle?.set("selectedDate", selectedDate)
                     navController.navigate(Routes.ADD_EVENT)
                 },
                 onNavigateToEventDetails = { eventId ->
@@ -46,54 +48,39 @@ fun EventifyNavigation() {
             )
         }
 
-        // Add Event Screen
+        // ── Add Event ─────────────────────────────────────────
         composable(route = Routes.ADD_EVENT) {
-            val selectedDate = navController.previousBackStackEntry
-                ?.savedStateHandle
-                ?.get<String>("selectedDate")
+            val handle       = navController.previousBackStackEntry?.savedStateHandle
+            val selectedDate = handle?.get<String>("selectedDate")
 
             AddEventScreen(
                 onNavigateBack = {
-                    navController.previousBackStackEntry
-                        ?.savedStateHandle
-                        ?.remove<String>("selectedDate")
+                    handle?.remove<String>("selectedDate")
                     navController.popBackStack()
                 },
-                onSaveEvent = { title, type, startDate, startTime, notes ->
-                    // TODO: Save to database
-                    navController.previousBackStackEntry
-                        ?.savedStateHandle
-                        ?.remove<String>("selectedDate")
+                onSaveEvent = { _, _, _, _, _ ->
+                    handle?.remove<String>("selectedDate")
                     navController.popBackStack()
                 },
-                prefilledDate = selectedDate
+                prefilledDate = selectedDate,
+                currentTheme  = currentTheme
             )
         }
 
-        // Event Details Screen
+        // ── Event Details ─────────────────────────────────────
         composable(
-            route = "${Routes.EVENT_DETAILS}/{eventId}",
-            arguments = listOf(
-                navArgument("eventId") {
-                    type = NavType.IntType
-                }
-            )
+            route     = "${Routes.EVENT_DETAILS}/{eventId}",
+            arguments = listOf(navArgument("eventId") { type = NavType.IntType })
         ) { backStackEntry ->
             val eventId = backStackEntry.arguments?.getInt("eventId") ?: 0
-            val event = DummyData.events.find { it.id == eventId }
+            val event   = DummyData.events.find { it.id == eventId }
 
             if (event != null) {
                 CountdownTimerScreen(
-                    event = event,
-                    onNavigateBack = {
-                        navController.popBackStack()
-                    },
-                    onEdit = {
-                        navController.navigate(Routes.ADD_EVENT)
-                    },
-                    onDelete = {
-                        // TODO: In Phase 2, delete from database
-                    }
+                    event          = event,
+                    onNavigateBack = { navController.popBackStack() },
+                    onEdit         = { navController.navigate(Routes.ADD_EVENT) },
+                    onDelete       = { }
                 )
             }
         }
