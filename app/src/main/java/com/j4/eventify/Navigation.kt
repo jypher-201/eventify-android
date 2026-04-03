@@ -2,6 +2,7 @@ package com.j4.eventify
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -28,6 +29,9 @@ fun EventifyNavigation() {
     var themeOrdinal by rememberSaveable { mutableStateOf(AppTheme.DEFAULT.ordinal) }
     val currentTheme = AppTheme.entries[themeOrdinal]
 
+    // Single source of truth for all event types
+    val registry = remember { EventTypeRegistry() }
+
     NavHost(
         navController    = navController,
         startDestination = Routes.HOME
@@ -37,6 +41,7 @@ fun EventifyNavigation() {
             HomeScreen(
                 currentTheme             = currentTheme,
                 onThemeChange            = { themeOrdinal = it.ordinal },
+                registry                 = registry,
                 onNavigateToAddEvent     = { selectedDate, _ ->
                     val handle = navController.currentBackStackEntry?.savedStateHandle
                     if (selectedDate != null) handle?.set("selectedDate", selectedDate)
@@ -54,6 +59,7 @@ fun EventifyNavigation() {
             val selectedDate = handle?.get<String>("selectedDate")
 
             AddEventScreen(
+                registry       = registry,
                 onNavigateBack = {
                     handle?.remove<String>("selectedDate")
                     navController.popBackStack()

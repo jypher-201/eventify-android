@@ -3,9 +3,13 @@ package com.j4.eventify
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -23,6 +27,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.j4.eventify.components.EventType
+import com.j4.eventify.components.EventTypeConfig
+import com.j4.eventify.EventTypeRegistry
+import com.j4.eventify.BuiltInTypeState
+import com.j4.eventify.BuiltInIcon
+import com.j4.eventify.components.gradientPalette
+import com.j4.eventify.components.textColorForGradient
+import com.j4.eventify.components.badgeColorForGradient
 import com.j4.eventify.ui.theme.*
 import androidx.compose.foundation.layout.statusBarsPadding
 import java.text.SimpleDateFormat
@@ -64,7 +75,7 @@ fun formatTime(hour: Int, minute: Int): String {
         hour > 12  -> hour - 12
         else       -> hour
     }
-    return String.format("%d:%02d %s", displayHour, minute, amPm)
+    return String.format(Locale.US, "%d:%02d %s", displayHour, minute, amPm)
 }
 
 // ─────────────────────────────────────────────
@@ -77,7 +88,8 @@ fun AddEventScreen(
     onNavigateBack: () -> Unit = {},
     onSaveEvent: (String, EventType, String, String, String) -> Unit = { _, _, _, _, _ -> },
     prefilledDate: String? = null,
-    currentTheme: AppTheme = AppTheme.DEFAULT
+    currentTheme: AppTheme = AppTheme.DEFAULT,
+    registry: EventTypeRegistry = androidx.compose.runtime.remember { EventTypeRegistry() }
 ) {
     // Derive colors from theme
     val accent      = getAccentColor(currentTheme)
@@ -89,7 +101,12 @@ fun AddEventScreen(
     val isDark      = currentTheme == AppTheme.DARK
 
     var title     by remember { mutableStateOf("") }
-    var selectedType by remember { mutableStateOf(EventType.ACADEMIC) }
+    var selectedType      by remember { mutableStateOf(EventType.ACADEMIC) }
+    // Custom types added in this session
+    var customTypes       by remember { mutableStateOf(listOf<EventTypeConfig>()) }
+    var selectedCustomCfg by remember { mutableStateOf<EventTypeConfig?>(null) }
+    var showCustomTypeDialog  by remember { mutableStateOf(false) }
+    var showCustomTypePicker  by remember { mutableStateOf(false) }
     var startDate by remember { mutableStateOf(prefilledDate ?: "Feb 25, 2024") }
     var endDate   by remember { mutableStateOf(prefilledDate ?: "Feb 25, 2024") }
     var startTime by remember { mutableStateOf("9:00 AM") }
@@ -166,11 +183,22 @@ fun AddEventScreen(
 
             // Type selector
             AddEventTypeSelector(
-                selectedType    = selectedType,
-                onTypeSelected  = { selectedType = it },
-                accent          = accent,
-                surfColor       = surfColor,
-                isDark          = isDark
+                selectedType      = selectedType,
+                onTypeSelected    = { type ->
+                    selectedType      = type
+                    selectedCustomCfg = null
+                },
+                customTypes       = customTypes,
+                selectedCustomCfg = selectedCustomCfg,
+                onCustomSelected  = { cfg ->
+                    selectedType      = EventType.CUSTOM
+                    selectedCustomCfg = cfg
+                },
+                onAddCustomClick  = { showCustomTypePicker = true },
+                accent            = accent,
+                surfColor         = surfColor,
+                isDark            = isDark,
+                registry          = registry
             )
 
             // Date / Time card — Google Calendar style
@@ -265,6 +293,54 @@ fun AddEventScreen(
             onConfirm = { customLabel ->
                 if (!notifications.contains(customLabel)) notifications = notifications + customLabel
                 showCustomDialog = false
+            }
+        )
+    }
+
+    // Custom type picker — choose from existing or create new
+    if (showCustomTypePicker) {
+        CustomTypePickerSheet(
+            registry  = registry,
+            accent    = accent,
+            surfColor = surfColor,
+            textColor = textColor,
+            onDismiss = { showCustomTypePicker = false },
+            onSelectExisting = { cfg ->
+                customTypes       = if (!customTypes.contains(cfg)) customTypes + cfg else customTypes
+                selectedType      = EventType.CUSTOM
+                selectedCustomCfg = cfg
+                showCustomTypePicker = false
+            },
+            onCreateNew = {
+                showCustomTypePicker = false
+                showCustomTypeDialog = true
+            }
+        )
+    }
+
+    // Custom type dialog
+    if (showCustomTypeDialog) {
+        // Reuse EditTypeDialog in "create" mode — blank name, default icon/color
+        EditTypeDialog(
+            initialLabel    = "",
+            initialGradient = 3,              // blue — avoids clashing with the 3 defaults
+            initialIconKey  = BuiltInIcon.STAR,
+            onDismiss       = { showCustomTypeDialog = false },
+            onConfirm       = { result ->
+                val pair = gradientPalette[result.gradientIndex]
+                val cfg  = EventTypeConfig(
+                    type          = EventType.CUSTOM,
+                    label         = result.label.uppercase().take(10),
+                    gradientStart = pair.first,
+                    gradientEnd   = pair.second,
+                    textColor     = textColorForGradient(pair.first),
+                    badgeColor    = badgeColorForGradient(pair.first, pair.second)
+                )
+                registry.addCustomType(cfg)
+                customTypes          = customTypes + cfg
+                selectedType         = EventType.CUSTOM
+                selectedCustomCfg    = cfg
+                showCustomTypeDialog = false
             }
         )
     }
@@ -487,57 +563,69 @@ fun AddEventField(
 fun AddEventTypeSelector(
     selectedType: EventType,
     onTypeSelected: (EventType) -> Unit,
+    customTypes: List<EventTypeConfig>,
+    selectedCustomCfg: EventTypeConfig?,
+    onCustomSelected: (EventTypeConfig) -> Unit,
+    onAddCustomClick: () -> Unit,
     accent: Color,
     surfColor: Color,
-    isDark: Boolean
+    isDark: Boolean,
+    registry: EventTypeRegistry = EventTypeRegistry()
 ) {
-    Row(
+    // 3 pinned defaults always visible + selected custom chips + add button
+    // All in one horizontal scrollable LazyRow
+    androidx.compose.foundation.lazy.LazyRow(
         modifier              = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        AddEventTypeChip(
-            text     = "Academic",
-            icon     = Icons.Default.School,
-            selected = selectedType == EventType.ACADEMIC,
-            onClick  = { onTypeSelected(EventType.ACADEMIC) },
-            color    = Color(0xFF667eea),
-            surfColor = surfColor,
-            modifier = Modifier.weight(1f)
-        )
-        AddEventTypeChip(
-            text     = "Personal",
-            icon     = Icons.Default.FitnessCenter,
-            selected = selectedType == EventType.PERSONAL,
-            onClick  = { onTypeSelected(EventType.PERSONAL) },
-            color    = Color(0xFFf093fb),
-            surfColor = surfColor,
-            modifier = Modifier.weight(1f)
-        )
-        AddEventTypeChip(
-            text     = "Occasion",
-            icon     = Icons.Default.Cake,
-            selected = selectedType == EventType.OCCASION,
-            onClick  = { onTypeSelected(EventType.OCCASION) },
-            color    = Color(0xFFfcb69f),
-            surfColor = surfColor,
-            modifier = Modifier.weight(1f)
-        )
-        // + Add button
-        Surface(
-            onClick         = { /* TODO */ },
-            modifier        = Modifier.size(54.dp),
-            shape           = RoundedCornerShape(12.dp),
-            color           = surfColor,
-            shadowElevation = 2.dp,
-            border          = BorderStroke(1.5.dp, accent.copy(alpha = 0.4f))
-        ) {
-            Column(
-                modifier              = Modifier.fillMaxSize(),
-                horizontalAlignment   = Alignment.CenterHorizontally,
-                verticalArrangement   = Arrangement.Center
+        // ── Pinned built-ins (always shown, use registry colors) ──
+        val builtIns = listOf(registry.academic, registry.personal, registry.occasion)
+        items(builtIns) { state ->
+            val cfg = state.toConfig()
+            AddEventTypeChip(
+                text      = state.label,
+                icon      = state.icon,
+                selected  = selectedType == state.type,
+                onClick   = { onTypeSelected(state.type) },
+                color         = cfg.gradientStart,
+                surfColor     = surfColor,
+                chipTextColor = if (isDark) Color.White else Color(0xFF1A1A1A),
+                modifier      = Modifier.width(86.dp)
+            )
+        }
+
+        // ── Selected custom type chips (pinned after defaults) ──
+        items(customTypes) { cfg ->
+            AddEventTypeChip(
+                text      = cfg.label,
+                icon      = Icons.Default.Star,
+                selected  = selectedType == EventType.CUSTOM && selectedCustomCfg == cfg,
+                onClick   = { onCustomSelected(cfg) },
+                color         = cfg.gradientStart,
+                surfColor     = surfColor,
+                chipTextColor = if (isDark) Color.White else Color(0xFF1A1A1A),
+                modifier      = Modifier.width(86.dp)
+            )
+        }
+
+        // ── + button — opens picker of all registry custom types ──
+        item {
+            Surface(
+                onClick         = onAddCustomClick,
+                modifier        = Modifier.size(54.dp),
+                shape           = RoundedCornerShape(12.dp),
+                color           = surfColor,
+                shadowElevation = 2.dp,
+                border          = BorderStroke(1.5.dp, accent.copy(alpha = 0.4f))
             ) {
-                Icon(Icons.Default.Add, null, tint = accent, modifier = Modifier.size(22.dp))
-                Text("Add", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = accent)
+                Column(
+                    modifier            = Modifier.fillMaxSize(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Icon(Icons.Default.Add, null, tint = accent, modifier = Modifier.size(22.dp))
+                    Text("Add", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = accent)
+                }
             }
         }
     }
@@ -551,7 +639,9 @@ fun AddEventTypeChip(
     onClick: () -> Unit,
     color: Color,
     surfColor: Color,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    // Theme text color used when unselected so pale chips (e.g. Occasion) are readable
+    chipTextColor: Color = Color(0xFF1A1A1A)
 ) {
     val scale by animateFloatAsState(
         targetValue   = if (selected) 1.02f else 1f,
@@ -567,7 +657,7 @@ fun AddEventTypeChip(
         shape           = RoundedCornerShape(12.dp),
         color           = if (selected) color else surfColor,
         shadowElevation = if (selected) 5.dp else 2.dp,
-        border          = if (!selected) BorderStroke(1.5.dp, color.copy(alpha = 0.25f)) else null
+        border          = if (!selected) BorderStroke(1.5.dp, color.copy(alpha = 0.35f)) else null
     ) {
         Column(
             modifier              = Modifier
@@ -576,10 +666,15 @@ fun AddEventTypeChip(
             horizontalAlignment   = Alignment.CenterHorizontally,
             verticalArrangement   = Arrangement.Center
         ) {
-            Icon(icon, null, tint = if (selected) White else color, modifier = Modifier.size(20.dp))
+            // Selected: white icon/text on gradient bg
+            // Unselected: theme text color so pale gradients (Occasion) are still readable
+            Icon(icon, null,
+                tint     = if (selected) White else chipTextColor.copy(alpha = 0.75f),
+                modifier = Modifier.size(20.dp)
+            )
             Spacer(Modifier.height(3.dp))
             Text(text, fontSize = 12.sp, fontWeight = FontWeight.Bold,
-                color = if (selected) White else color)
+                color = if (selected) White else chipTextColor.copy(alpha = 0.75f))
         }
     }
 }
@@ -1460,6 +1555,312 @@ fun CustomRepeatDialog(
         dismissButton = {
             TextButton(onClick = onDismiss) {
                 Text("Cancel", color = textColor.copy(alpha = 0.6f))
+            }
+        }
+    )
+}
+
+// ─────────────────────────────────────────────
+// Add Custom Type Dialog
+// ─────────────────────────────────────────────
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AddCustomTypeDialog(
+    accent: Color,
+    surfColor: Color,
+    textColor: Color,
+    onDismiss: () -> Unit,
+    onConfirm: (EventTypeConfig) -> Unit
+) {
+    var typeName        by remember { mutableStateOf("") }
+    var selectedGradient by remember { mutableIntStateOf(3) } // default: blue
+
+    val chosen = gradientPalette[selectedGradient]
+    val previewTextColor  = textColorForGradient(chosen.first)
+    val previewBadgeColor = badgeColorForGradient(chosen.first, chosen.second)
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor   = surfColor,
+        shape            = RoundedCornerShape(20.dp),
+        title = {
+            Text(
+                "New Event Type",
+                fontSize   = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color      = textColor
+            )
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
+
+                // Name input
+                OutlinedTextField(
+                    value         = typeName,
+                    onValueChange = { if (it.length <= 16) typeName = it },
+                    label         = { Text("Type name") },
+                    placeholder   = { Text("e.g. Work, Health…") },
+                    singleLine    = true,
+                    modifier      = Modifier.fillMaxWidth(),
+                    colors        = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor  = accent,
+                        focusedLabelColor   = accent,
+                        cursorColor         = accent,
+                        unfocusedTextColor  = textColor,
+                        focusedTextColor    = textColor
+                    )
+                )
+
+                // Gradient picker
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "Card color",
+                        fontSize = 13.sp,
+                        color    = textColor.copy(alpha = 0.6f)
+                    )
+
+                    // 2-row grid of gradient swatches
+                    val rows = gradientPalette.chunked(6)
+                    rows.forEach { row ->
+                        Row(
+                            modifier              = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            row.forEachIndexed { colIdx, pair ->
+                                val globalIdx = gradientPalette.indexOf(pair)
+                                val isSelected = selectedGradient == globalIdx
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .aspectRatio(1f)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(
+                                            androidx.compose.ui.graphics.Brush.linearGradient(
+                                                listOf(pair.first, pair.second)
+                                            )
+                                        )
+                                        .then(
+                                            if (isSelected)
+                                                Modifier.border(
+                                                    2.5.dp,
+                                                    textColor,
+                                                    RoundedCornerShape(10.dp)
+                                                )
+                                            else Modifier
+                                        )
+                                        .clickable { selectedGradient = globalIdx },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (isSelected) {
+                                        Icon(
+                                            Icons.Default.Check,
+                                            null,
+                                            tint     = textColorForGradient(pair.first),
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Live preview card strip
+                if (typeName.isNotBlank()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(44.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(
+                                androidx.compose.ui.graphics.Brush.linearGradient(
+                                    listOf(chosen.first, chosen.second)
+                                )
+                            )
+                            .padding(horizontal = 14.dp),
+                        contentAlignment = Alignment.CenterStart
+                    ) {
+                        Row(
+                            modifier              = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment     = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                typeName,
+                                fontSize   = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                color      = previewTextColor
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(Color.White.copy(alpha = 0.85f))
+                                    .padding(horizontal = 8.dp, vertical = 3.dp)
+                            ) {
+                                Text(
+                                    typeName.uppercase().take(10),
+                                    fontSize      = 9.sp,
+                                    fontWeight    = FontWeight.Black,
+                                    color         = previewBadgeColor,
+                                    letterSpacing = 0.5.sp
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Surface(
+                onClick = {
+                    if (typeName.isNotBlank()) {
+                        onConfirm(
+                            EventTypeConfig(
+                                type          = com.j4.eventify.components.EventType.CUSTOM,
+                                label         = typeName.uppercase().take(10),
+                                gradientStart = chosen.first,
+                                gradientEnd   = chosen.second,
+                                textColor     = previewTextColor,
+                                badgeColor    = previewBadgeColor
+                            )
+                        )
+                    }
+                },
+                shape = RoundedCornerShape(10.dp),
+                color = if (typeName.isNotBlank()) accent else accent.copy(alpha = 0.3f)
+            ) {
+                Text(
+                    "Create",
+                    fontSize   = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    color      = White,
+                    modifier   = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = textColor.copy(alpha = 0.6f))
+            }
+        }
+    )
+}
+
+// ─────────────────────────────────────────────
+// Custom Type Picker Sheet
+// Shows all custom types from registry + "Create new" option
+// ─────────────────────────────────────────────
+
+@Composable
+fun CustomTypePickerSheet(
+    registry: EventTypeRegistry,
+    accent: Color,
+    surfColor: Color,
+    textColor: Color,
+    onDismiss: () -> Unit,
+    onSelectExisting: (EventTypeConfig) -> Unit,
+    onCreateNew: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor   = surfColor,
+        shape            = RoundedCornerShape(20.dp),
+        title = {
+            Text(
+                "Add event type",
+                fontSize   = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color      = textColor
+            )
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                if (registry.customTypes.isEmpty()) {
+                    Text(
+                        "No custom types yet. Create one!",
+                        fontSize = 14.sp,
+                        color    = textColor.copy(alpha = 0.5f),
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    )
+                } else {
+                    Text(
+                        "Your custom types",
+                        fontSize = 12.sp,
+                        color    = textColor.copy(alpha = 0.5f)
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    registry.customTypes.forEach { cfg ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .clickable { onSelectExisting(cfg) }
+                                .padding(horizontal = 8.dp, vertical = 12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment     = Alignment.CenterVertically
+                        ) {
+                            // Gradient dot
+                            Box(
+                                modifier = Modifier
+                                    .size(28.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        androidx.compose.ui.graphics.Brush.linearGradient(
+                                            listOf(cfg.gradientStart, cfg.gradientEnd)
+                                        )
+                                    )
+                            )
+                            Text(
+                                cfg.label,
+                                fontSize  = 15.sp,
+                                color     = textColor,
+                                modifier  = Modifier.weight(1f)
+                            )
+                            Icon(
+                                Icons.Default.ChevronRight,
+                                null,
+                                tint     = textColor.copy(alpha = 0.3f),
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                        HorizontalDivider(color = textColor.copy(alpha = 0.06f))
+                    }
+                }
+
+                // Always show "Create new type" option
+                Spacer(Modifier.height(4.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .clickable { onCreateNew() }
+                        .padding(horizontal = 8.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment     = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier         = Modifier
+                            .size(28.dp)
+                            .clip(CircleShape)
+                            .background(accent.copy(alpha = 0.12f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.Add, null, tint = accent, modifier = Modifier.size(16.dp))
+                    }
+                    Text(
+                        "Create new type",
+                        fontSize   = 15.sp,
+                        color      = accent,
+                        fontWeight = FontWeight.Medium,
+                        modifier   = Modifier.weight(1f)
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = textColor.copy(alpha = 0.5f))
             }
         }
     )

@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.sp
 import com.j4.eventify.components.Event
 import com.j4.eventify.components.EventCard
 import com.j4.eventify.components.EventType
+import com.j4.eventify.components.EventTypeConfig
 import java.util.Calendar
 
 // ─────────────────────────────────────────────
@@ -320,6 +321,7 @@ fun ModernDayCell(
                             EventType.ACADEMIC -> Color(0xFF667eea)
                             EventType.PERSONAL -> Color(0xFFf093fb)
                             EventType.OCCASION -> Color(0xFFfcb69f)
+                            EventType.CUSTOM   -> calEvent.event.customConfig?.gradientStart ?: accentColor
                         }
                         Box(
                             modifier = Modifier
