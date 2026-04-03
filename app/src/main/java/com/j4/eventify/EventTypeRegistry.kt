@@ -77,13 +77,25 @@ data class BuiltInTypeState(
 
     fun toConfig(): EventTypeConfig {
         val pair = gradientPalette[gradientIndex.coerceIn(0, gradientPalette.lastIndex)]
+        // Preserve original hand-tuned text/badge colors for the 3 default gradient indices.
+        // Only auto-derive colors when user picks a custom gradient.
+        val (textColor, badgeColor) = when {
+            type == EventType.ACADEMIC && gradientIndex == 0 ->
+                Pair(androidx.compose.ui.graphics.Color.White, androidx.compose.ui.graphics.Color(0xFF5E35B1))
+            type == EventType.PERSONAL && gradientIndex == 1 ->
+                Pair(androidx.compose.ui.graphics.Color.White, androidx.compose.ui.graphics.Color(0xFFD81B60))
+            type == EventType.OCCASION && gradientIndex == 2 ->
+                Pair(androidx.compose.ui.graphics.Color(0xFF8B4513), androidx.compose.ui.graphics.Color(0xFFEF6C00))
+            else ->
+                Pair(textColorForGradient(pair.first), badgeColorForGradient(pair.first, pair.second))
+        }
         return EventTypeConfig(
             type          = type,
             label         = label.uppercase(),
             gradientStart = pair.first,
             gradientEnd   = pair.second,
-            textColor     = textColorForGradient(pair.first),
-            badgeColor    = badgeColorForGradient(pair.first, pair.second)
+            textColor     = textColor,
+            badgeColor    = badgeColor
         )
     }
 }

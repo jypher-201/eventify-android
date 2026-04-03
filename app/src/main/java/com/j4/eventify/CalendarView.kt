@@ -64,7 +64,8 @@ fun CalendarView(
     modifier: Modifier = Modifier,
     accentColor: Color = Color(0xFF667eea),
     textColor: Color   = Color(0xFF1A1A1A),
-    surfaceColor: Color = Color.White
+    surfaceColor: Color = Color.White,
+    configResolver: ((Event) -> com.j4.eventify.components.EventTypeConfig)? = null
 ) {
     val philippinesZone = java.util.TimeZone.getTimeZone("Asia/Manila")
     val today           = Calendar.getInstance(philippinesZone)
@@ -235,7 +236,11 @@ fun CalendarView(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(selectedDayEvents) { event ->
-                    EventCard(event = event, onClick = { onEventClick(event.id) })
+                    EventCard(
+                        event          = event,
+                        onClick        = { onEventClick(event.id) },
+                        overrideConfig = configResolver?.invoke(event)
+                    )
                 }
             }
         } else {

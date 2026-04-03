@@ -144,9 +144,11 @@ fun Event.resolvedConfig(): EventTypeConfig = when {
 fun EventCard(
     event: Event,
     modifier: Modifier = Modifier,
-    onClick: () -> Unit = {}
+    onClick: () -> Unit = {},
+    // Pass registry.resolveForType(...) here to get live color updates
+    overrideConfig: EventTypeConfig? = null
 ) {
-    val config = remember(event) { event.resolvedConfig() }
+    val config = overrideConfig ?: remember(event) { event.resolvedConfig() }
 
     val cardBrush = remember(config) {
         Brush.linearGradient(listOf(config.gradientStart, config.gradientEnd))

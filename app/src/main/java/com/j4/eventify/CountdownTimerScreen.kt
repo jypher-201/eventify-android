@@ -1,6 +1,7 @@
 package com.j4.eventify
 
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -153,7 +154,7 @@ fun CountdownTimerScreen(
                         .width(150.dp)
                         .height(4.dp)
                         .clip(RoundedCornerShape(2.dp))
-                        .background(textColor)
+                        .background(textColor.copy(alpha = 0.6f))
                 )
 
                 Box(
@@ -290,7 +291,7 @@ fun CountdownTimerScreen(
             }
 
             Column(
-                modifier            = Modifier.fillMaxWidth(),
+                modifier            = Modifier.fillMaxWidth().padding(bottom = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 ModernInfoCard(
@@ -302,7 +303,7 @@ fun CountdownTimerScreen(
                 ModernInfoCard(
                     icon      = Icons.AutoMirrored.Filled.Label,
                     title     = "Event Type",
-                    content   = config.label,   // use config label, not enum name
+                    content   = config.label,
                     textColor = textColor
                 )
                 if (event.notes.isNotEmpty()) {
@@ -354,14 +355,22 @@ fun ModernCountdownTopBar(
             )
         }
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            Surface(onClick = onEdit, shape = CircleShape, color = Color.White.copy(alpha = 0.2f)) {
+            Surface(
+                onClick = onEdit,
+                shape = CircleShape,
+                color = Color.White.copy(alpha = 0.2f)
+            ) {
                 Icon(
                     Icons.Default.Edit, "Edit",
                     tint     = textColor,
                     modifier = Modifier.padding(10.dp).size(22.dp)
                 )
             }
-            Surface(onClick = onDelete, shape = CircleShape, color = Color.White.copy(alpha = 0.2f)) {
+            Surface(
+                onClick = onDelete,
+                shape = CircleShape,
+                color = Color.White.copy(alpha = 0.2f)
+            ) {
                 Icon(
                     Icons.Default.Delete, "Delete",
                     tint     = textColor,
@@ -424,24 +433,39 @@ fun ModernInfoCard(
     textColor: Color
 ) {
     Surface(
-        shape    = RoundedCornerShape(16.dp),
-        color    = Color.White.copy(alpha = 0.15f),
-        modifier = Modifier.fillMaxWidth()
+        shape    = RoundedCornerShape(20.dp),
+        color    = Color.White.copy(alpha = 0.12f),
+        modifier = Modifier.fillMaxWidth(),
+        border   = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
     ) {
         Row(
             modifier              = Modifier.fillMaxWidth().padding(16.dp),
             horizontalArrangement = Arrangement.spacedBy(14.dp),
             verticalAlignment     = Alignment.CenterVertically
         ) {
-            Surface(shape = CircleShape, color = Color.White.copy(alpha = 0.25f), modifier = Modifier.size(44.dp)) {
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = textColor.copy(alpha = 0.15f),
+                modifier = Modifier.size(44.dp)
+            ) {
                 Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                     Icon(icon, null, tint = textColor, modifier = Modifier.size(22.dp))
                 }
             }
             Column(modifier = Modifier.weight(1f)) {
-                Text(title,   fontSize = 12.sp, fontWeight = FontWeight.Bold,  color = textColor.copy(alpha = 0.7f))
-                Spacer(Modifier.height(4.dp))
-                Text(content, fontSize = 16.sp, fontWeight = FontWeight.Bold,  color = textColor)
+                Text(
+                    title,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = textColor.copy(alpha = 0.6f)
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    content,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = textColor
+                )
             }
         }
     }
@@ -467,14 +491,24 @@ fun ModernDeleteDialog(
         shape            = RoundedCornerShape(24.dp),
         modifier         = Modifier.graphicsLayer { scaleX = scale; scaleY = scale },
         icon = {
-            Surface(shape = CircleShape, color = Color(0xFFFF5252).copy(alpha = 0.1f), modifier = Modifier.size(64.dp)) {
+            Surface(
+                shape = CircleShape,
+                color = Color(0xFFFF5252).copy(alpha = 0.1f),
+                modifier = Modifier.size(64.dp)
+            ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(Icons.Default.Warning, null, tint = Color(0xFFFF5252), modifier = Modifier.size(32.dp))
                 }
             }
         },
         title = {
-            Text("Delete Event?", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1A1A1A), textAlign = TextAlign.Center)
+            Text(
+                "Delete Event?",
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF1A1A1A),
+                textAlign = TextAlign.Center
+            )
         },
         text = {
             Text(
@@ -485,13 +519,33 @@ fun ModernDeleteDialog(
             )
         },
         confirmButton = {
-            Surface(onClick = onConfirm, shape = RoundedCornerShape(12.dp), color = Color(0xFFFF5252)) {
-                Text("Delete", fontWeight = FontWeight.Bold, color = White, modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp), fontSize = 15.sp)
+            Surface(
+                onClick = onConfirm,
+                shape = RoundedCornerShape(12.dp),
+                color = Color(0xFFFF5252)
+            ) {
+                Text(
+                    "Delete",
+                    fontWeight = FontWeight.Bold,
+                    color = White,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
+                    fontSize = 15.sp
+                )
             }
         },
         dismissButton = {
-            Surface(onClick = onDismiss, shape = RoundedCornerShape(12.dp), color = Color(0xFFF5F5F5)) {
-                Text("Cancel", fontWeight = FontWeight.Bold, color = Color(0xFF1A1A1A), modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp), fontSize = 15.sp)
+            Surface(
+                onClick = onDismiss,
+                shape = RoundedCornerShape(12.dp),
+                color = Color(0xFFF5F5F5)
+            ) {
+                Text(
+                    "Cancel",
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF1A1A1A),
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
+                    fontSize = 15.sp
+                )
             }
         }
     )

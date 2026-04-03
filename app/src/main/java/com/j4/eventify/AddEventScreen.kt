@@ -323,8 +323,10 @@ fun AddEventScreen(
         // Reuse EditTypeDialog in "create" mode — blank name, default icon/color
         EditTypeDialog(
             initialLabel    = "",
-            initialGradient = 3,              // blue — avoids clashing with the 3 defaults
+            initialGradient = 3,
             initialIconKey  = BuiltInIcon.STAR,
+            surfColor       = surfColor,
+            textColor       = textColor,
             onDismiss       = { showCustomTypeDialog = false },
             onConfirm       = { result ->
                 val pair = gradientPalette[result.gradientIndex]
@@ -589,6 +591,7 @@ fun AddEventTypeSelector(
                 onClick   = { onTypeSelected(state.type) },
                 color         = cfg.gradientStart,
                 surfColor     = surfColor,
+                accent        = accent,
                 chipTextColor = if (isDark) Color.White else Color(0xFF1A1A1A),
                 modifier      = Modifier.width(86.dp)
             )
@@ -603,6 +606,7 @@ fun AddEventTypeSelector(
                 onClick   = { onCustomSelected(cfg) },
                 color         = cfg.gradientStart,
                 surfColor     = surfColor,
+                accent        = accent,
                 chipTextColor = if (isDark) Color.White else Color(0xFF1A1A1A),
                 modifier      = Modifier.width(86.dp)
             )
@@ -637,10 +641,10 @@ fun AddEventTypeChip(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     selected: Boolean,
     onClick: () -> Unit,
-    color: Color,
+    color: Color,           // gradient/type specific color
     surfColor: Color,
     modifier: Modifier = Modifier,
-    // Theme text color used when unselected so pale chips (e.g. Occasion) are readable
+    accent: Color = Color(0xFF667eea),     // theme accent
     chipTextColor: Color = Color(0xFF1A1A1A)
 ) {
     val scale by animateFloatAsState(
@@ -652,29 +656,39 @@ fun AddEventTypeChip(
     Surface(
         onClick         = onClick,
         modifier        = modifier
-            .height(54.dp)
+            .height(56.dp)
             .graphicsLayer { scaleX = scale; scaleY = scale },
-        shape           = RoundedCornerShape(12.dp),
-        color           = if (selected) color else surfColor,
-        shadowElevation = if (selected) 5.dp else 2.dp,
-        border          = if (!selected) BorderStroke(1.5.dp, color.copy(alpha = 0.35f)) else null
+        shape           = RoundedCornerShape(13.dp), // Consistent with your Title/Notes fields
+        // Selection Logic: If selected, use the accent. Otherwise, use surfColor.
+        color           = if (selected) accent else surfColor,
+        shadowElevation = if (selected) 4.dp else 2.dp,
+        // Optional subtle border when unselected to match your "Add" button style
+        border          = if (!selected) BorderStroke(1.dp, accent.copy(alpha = 0.1f)) else null
     ) {
         Column(
-            modifier              = Modifier
-                .fillMaxSize()
-                .padding(6.dp),
+            modifier              = Modifier.fillMaxSize(),
             horizontalAlignment   = Alignment.CenterHorizontally,
             verticalArrangement   = Arrangement.Center
         ) {
-            // Selected: white icon/text on gradient bg
-            // Unselected: theme text color so pale gradients (Occasion) are still readable
-            Icon(icon, null,
-                tint     = if (selected) White else chipTextColor.copy(alpha = 0.75f),
-                modifier = Modifier.size(20.dp)
+            // Box removed. Icon now sits directly on the surface like your Repeat/Location icons.
+            Icon(
+                icon,
+                null,
+                // Selected: White. Unselected: Theme accent.
+                tint     = if (selected) Color.White else accent,
+                modifier = Modifier.size(22.dp) // Matched to your other card icon sizes
             )
-            Spacer(Modifier.height(3.dp))
-            Text(text, fontSize = 12.sp, fontWeight = FontWeight.Bold,
-                color = if (selected) White else chipTextColor.copy(alpha = 0.75f))
+
+            Spacer(Modifier.height(4.dp))
+
+            Text(
+                text       = text,
+                fontSize   = 12.sp,
+                fontWeight = FontWeight.Bold,
+                // Selected: White. Unselected: Main text color.
+                color      = if (selected) Color.White else chipTextColor.copy(alpha = 0.8f),
+                maxLines   = 1
+            )
         }
     }
 }

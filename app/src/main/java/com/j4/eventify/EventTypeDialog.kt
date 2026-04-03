@@ -53,25 +53,30 @@ fun EditTypeDialog(
     initialGradient: Int,
     initialIconKey: BuiltInIcon,
     onDismiss: () -> Unit,
-    onConfirm: (EditTypeResult) -> Unit
+    onConfirm: (EditTypeResult) -> Unit,
+    surfColor: Color = White,
+    textColor: Color = Color(0xFF1A1A1A)
 ) {
     var label         by remember { mutableStateOf(initialLabel) }
     var gradientIndex by remember { mutableIntStateOf(initialGradient) }
     var iconKey       by remember { mutableStateOf(initialIconKey) }
 
-    val allIcons = BuiltInIcon.entries.toList()
+    val allIcons  = BuiltInIcon.entries.toList()
     val palette   = com.j4.eventify.components.gradientPalette
+    val curAccent = palette[gradientIndex].first
+    val iconUnselBg = if (textColor == Color.White) Color.White.copy(alpha = 0.1f) else Color(0xFFF5F5F5)
+    val iconUnselTint = textColor.copy(alpha = 0.5f)
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor   = White,
+        containerColor   = surfColor,
         shape            = RoundedCornerShape(20.dp),
         title = {
             Text(
-                "Edit event type",
+                if (initialLabel.isBlank()) "New event type" else "Edit event type",
                 fontSize   = 18.sp,
                 fontWeight = FontWeight.Bold,
-                color      = Color(0xFF1A1A1A)
+                color      = textColor
             )
         },
         text = {
@@ -88,14 +93,17 @@ fun EditTypeDialog(
                         singleLine    = true,
                         modifier      = Modifier.fillMaxWidth(),
                         colors        = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = palette[gradientIndex].first,
-                            focusedLabelColor  = palette[gradientIndex].first,
-                            cursorColor        = palette[gradientIndex].first
+                            focusedBorderColor  = curAccent,
+                            focusedLabelColor   = curAccent,
+                            cursorColor         = curAccent,
+                            unfocusedTextColor  = textColor,
+                            focusedTextColor    = textColor,
+                            unfocusedLabelColor = textColor.copy(alpha = 0.5f)
                         )
                     )
 
                     // ── Icon picker ───────────────────────────────
-                    Text("Icon", fontSize = 12.sp, color = Color.Gray)
+                    Text("Icon", fontSize = 12.sp, color = textColor.copy(alpha = 0.5f))
                     allIcons.chunked(8).forEach { row ->
                         Row(
                             modifier              = Modifier.fillMaxWidth(),
@@ -104,11 +112,10 @@ fun EditTypeDialog(
                             row.forEach { key ->
                                 val sel = iconKey == key
                                 Surface(
-                                    onClick = { iconKey = key },
-                                    shape   = RoundedCornerShape(10.dp),
-                                    color   = if (sel) palette[gradientIndex].first.copy(alpha = 0.15f)
-                                    else Color(0xFFF5F5F5),
-                                    border  = if (sel) BorderStroke(2.dp, palette[gradientIndex].first) else null,
+                                    onClick  = { iconKey = key },
+                                    shape    = RoundedCornerShape(10.dp),
+                                    color    = if (sel) curAccent.copy(alpha = 0.15f) else iconUnselBg,
+                                    border   = if (sel) BorderStroke(2.dp, curAccent) else null,
                                     modifier = Modifier.weight(1f).aspectRatio(1f)
                                 ) {
                                     Box(
@@ -116,21 +123,19 @@ fun EditTypeDialog(
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Icon(
-                                            key.imageVector,
-                                            key.label,
-                                            tint     = if (sel) palette[gradientIndex].first else Color.Gray,
+                                            key.imageVector, key.label,
+                                            tint     = if (sel) curAccent else iconUnselTint,
                                             modifier = Modifier.size(18.dp)
                                         )
                                     }
                                 }
                             }
-                            // fill remaining slots in last row
                             repeat(8 - row.size) { Spacer(Modifier.weight(1f)) }
                         }
                     }
 
                     // ── Color / gradient picker ───────────────────
-                    Text("Color", fontSize = 12.sp, color = Color.Gray)
+                    Text("Color", fontSize = 12.sp, color = textColor.copy(alpha = 0.5f))
                     palette.chunked(6).forEach { row ->
                         Row(
                             modifier              = Modifier.fillMaxWidth(),
@@ -150,7 +155,7 @@ fun EditTypeDialog(
                                             )
                                         )
                                         .then(
-                                            if (isSel) Modifier.border(2.5.dp, Color(0xFF1A1A1A), RoundedCornerShape(10.dp))
+                                            if (isSel) Modifier.border(2.5.dp, textColor, RoundedCornerShape(10.dp))
                                             else Modifier
                                         )
                                         .clickable { gradientIndex = idx },
@@ -199,28 +204,25 @@ fun EditTypeDialog(
         },
         confirmButton = {
             Surface(
-                onClick = {
-                    if (label.isNotBlank()) {
-                        onConfirm(EditTypeResult(label.trim(), gradientIndex, iconKey))
-                    }
-                },
-                shape = RoundedCornerShape(10.dp),
-                color = if (label.isNotBlank()) palette[gradientIndex].first
-                else Color(0xFFE0E0E0)
+                onClick = { if (label.isNotBlank()) onConfirm(EditTypeResult(label.trim(), gradientIndex, iconKey)) },
+                shape   = RoundedCornerShape(10.dp),
+                color   = if (label.isNotBlank()) curAccent else textColor.copy(alpha = 0.2f)
             ) {
                 Text(
                     "Apply",
                     fontSize   = 15.sp,
                     fontWeight = FontWeight.Bold,
                     color      = if (label.isNotBlank())
-                        com.j4.eventify.components.textColorForGradient(palette[gradientIndex].first)
-                    else Color.Gray,
+                        com.j4.eventify.components.textColorForGradient(curAccent)
+                    else textColor.copy(alpha = 0.4f),
                     modifier   = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)
                 )
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel", color = Color.Gray) }
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = textColor.copy(alpha = 0.6f))
+            }
         }
     )
 }

@@ -225,21 +225,25 @@ fun HomeScreen(
                                 ) {
                                     items(filteredAndSortedEvents, key = { it.id }) { event ->
                                         EventCard(
-                                            event   = event,
-                                            onClick = { onNavigateToEventDetails(event.id) }
+                                            event          = event,
+                                            onClick        = { onNavigateToEventDetails(event.id) },
+                                            overrideConfig = registry.resolveForType(event.type, event.customConfig)
                                         )
                                     }
                                 }
                             }
                             ViewMode.CALENDAR -> {
                                 CalendarView(
-                                    events         = filteredAndSortedEvents,
-                                    onEventClick   = onNavigateToEventDetails,
-                                    onDateSelected = { selectedCalendarDate = it },
-                                    modifier       = Modifier.fillMaxSize(),
-                                    accentColor    = accentColor,
-                                    textColor      = textColor,
-                                    surfaceColor   = surfaceColor
+                                    events          = filteredAndSortedEvents,
+                                    onEventClick    = onNavigateToEventDetails,
+                                    onDateSelected  = { selectedCalendarDate = it },
+                                    modifier        = Modifier.fillMaxSize(),
+                                    accentColor     = accentColor,
+                                    textColor       = textColor,
+                                    surfaceColor    = surfaceColor,
+                                    configResolver  = { event ->
+                                        registry.resolveForType(event.type, event.customConfig)
+                                    }
                                 )
                             }
                         }
@@ -266,6 +270,8 @@ fun HomeScreen(
             initialLabel    = state.label,
             initialGradient = state.gradientIndex,
             initialIconKey  = state.iconKey,
+            surfColor       = surfaceColor,
+            textColor       = textColor,
             onDismiss       = { editingBuiltIn = null },
             onConfirm       = { result ->
                 val updated = state.copy(
@@ -285,7 +291,12 @@ fun HomeScreen(
     }
 
     if (showAboutDialog) {
-        ModernAboutDialog(onDismiss = { showAboutDialog = false })
+        ModernAboutDialog(
+            onDismiss   = { showAboutDialog = false },
+            surfColor   = surfaceColor,
+            textColor   = textColor,
+            accentColor = accentColor
+        )
     }
 
     if (showCustomTypeDialog) {
@@ -828,7 +839,12 @@ fun ModernEmptyState(message: String, textColor: Color) {
 // ─────────────────────────────────────────────
 
 @Composable
-fun ModernAboutDialog(onDismiss: () -> Unit) {
+fun ModernAboutDialog(
+    onDismiss: () -> Unit,
+    surfColor: Color = White,
+    textColor: Color = Color(0xFF1A1A1A),
+    accentColor: Color = Color(0xFF667eea)
+) {
     var visible by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(
         targetValue   = if (visible) 1f else 0.8f,
@@ -839,7 +855,7 @@ fun ModernAboutDialog(onDismiss: () -> Unit) {
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor   = White,
+        containerColor   = surfColor,
         shape            = RoundedCornerShape(24.dp),
         modifier         = Modifier
             .graphicsLayer { scaleX = scale; scaleY = scale }
@@ -854,7 +870,7 @@ fun ModernAboutDialog(onDismiss: () -> Unit) {
                     "Eventify",
                     fontSize      = 28.sp,
                     fontWeight    = FontWeight.Black,
-                    color         = Color(0xFF1A1A1A),
+                    color         = textColor,
                     letterSpacing = 0.5.sp,
                     textAlign     = TextAlign.Center,
                     modifier      = Modifier.fillMaxWidth()
@@ -862,7 +878,7 @@ fun ModernAboutDialog(onDismiss: () -> Unit) {
                 Text(
                     "Version 1.0",
                     fontSize  = 14.sp,
-                    color     = Color.Gray,
+                    color     = textColor.copy(alpha = 0.5f),
                     textAlign = TextAlign.Center,
                     modifier  = Modifier.fillMaxWidth()
                 )
@@ -871,13 +887,13 @@ fun ModernAboutDialog(onDismiss: () -> Unit) {
                     verticalAlignment     = Alignment.CenterVertically,
                     modifier              = Modifier.fillMaxWidth()
                 ) {
-                    Text("by J", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color(0xFF667eea))
+                    Text("by J", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = accentColor)
                     Spacer(Modifier.width(4.dp))
                     Text(
                         "⁴",
                         fontSize   = 12.sp,
                         fontWeight = FontWeight.Bold,
-                        color      = Color(0xFF667eea),
+                        color      = accentColor,
                         modifier   = Modifier.offset(y = (-3).dp)
                     )
                 }
@@ -891,13 +907,13 @@ fun ModernAboutDialog(onDismiss: () -> Unit) {
                 Text(
                     "Your ultimate personal countdown companion for tracking life's important moments",
                     fontSize   = 15.sp,
-                    color      = Color(0xFF1A1A1A),
+                    color      = textColor,
                     textAlign  = TextAlign.Center,
                     fontWeight = FontWeight.Medium,
                     lineHeight = 22.sp,
                     modifier   = Modifier.fillMaxWidth()
                 )
-                HorizontalDivider(color = Color(0xFFE8E8E8))
+                HorizontalDivider(color = textColor.copy(alpha = 0.1f))
                 Column(
                     modifier            = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -906,31 +922,31 @@ fun ModernAboutDialog(onDismiss: () -> Unit) {
                         "What Eventify Does:",
                         fontSize   = 16.sp,
                         fontWeight = FontWeight.Bold,
-                        color      = Color(0xFF667eea),
+                        color      = accentColor,
                         textAlign  = TextAlign.Center,
                         modifier   = Modifier.fillMaxWidth()
                     )
                     Text(
                         "Never miss important dates! Track academic deadlines, personal milestones, and special occasions all in one beautiful app with customizable event types, live countdown timers, and smart filtering.",
                         fontSize   = 14.sp,
-                        color      = Color(0xFF1A1A1A),
+                        color      = textColor,
                         lineHeight = 21.sp,
                         textAlign  = TextAlign.Center,
                         modifier   = Modifier.fillMaxWidth()
                     )
                 }
-                HorizontalDivider(color = Color(0xFFE8E8E8))
+                HorizontalDivider(color = textColor.copy(alpha = 0.1f))
                 Text(
                     "© 2024 J⁴ Team",
                     fontSize  = 13.sp,
-                    color     = Color.Gray,
+                    color     = textColor.copy(alpha = 0.5f),
                     textAlign = TextAlign.Center,
                     modifier  = Modifier.fillMaxWidth()
                 )
             }
         },
         confirmButton = {
-            Surface(onClick = onDismiss, shape = RoundedCornerShape(12.dp), color = Color(0xFF667eea)) {
+            Surface(onClick = onDismiss, shape = RoundedCornerShape(12.dp), color = accentColor) {
                 Text(
                     "Got it!",
                     fontWeight = FontWeight.Bold,
@@ -1132,3 +1148,7 @@ fun DrawerCustomTypeItem(
         }
     }
 }
+
+// ─────────────────────────────────────────────
+// Edit Built-in Type Color Dialog
+// ─────────────────────────────────────────────
