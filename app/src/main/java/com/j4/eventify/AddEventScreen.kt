@@ -26,6 +26,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.j4.eventify.components.Event
 import com.j4.eventify.components.EventType
 import com.j4.eventify.components.EventTypeConfig
 import com.j4.eventify.EventTypeRegistry
@@ -59,13 +60,13 @@ private val standardNotificationOptions = listOf(
 )
 
 fun getNotificationLabel(value: String): String = when (value) {
-    "5m"     -> "5 minutes before"
-    "10m"    -> "10 minutes before"
-    "15m"    -> "15 minutes before"
-    "30m"    -> "30 minutes before"
-    "1h"     -> "1 hour before"
-    "1d"     -> "1 day before"
-    else     -> value   // custom values stored as display string directly
+    "5m"  -> "5 minutes before"
+    "10m" -> "10 minutes before"
+    "15m" -> "15 minutes before"
+    "30m" -> "30 minutes before"
+    "1h"  -> "1 hour before"
+    "1d"  -> "1 day before"
+    else  -> value
 }
 
 fun formatTime(hour: Int, minute: Int): String {
@@ -89,40 +90,45 @@ fun AddEventScreen(
     onSaveEvent: (String, EventType, String, String, String) -> Unit = { _, _, _, _, _ -> },
     prefilledDate: String? = null,
     currentTheme: AppTheme = AppTheme.DEFAULT,
-    registry: EventTypeRegistry = androidx.compose.runtime.remember { EventTypeRegistry() }
+    registry: EventTypeRegistry = androidx.compose.runtime.remember { EventTypeRegistry() },
+    prefilledEvent: Event? = null   // non-null → edit mode
 ) {
-    // Derive colors from theme
-    val accent      = getAccentColor(currentTheme)
-    val bgColor     = getBackgroundColor(currentTheme)
-    val surfColor   = getSurfaceColor(currentTheme)
-    val textColor   = getTextColor(currentTheme)
-    val topBarBg    = getTopBarColor(currentTheme)
-    val topBarFg    = getTopBarContentColor(currentTheme)
-    val isDark      = currentTheme == AppTheme.DARK
+    val isEditMode = prefilledEvent != null
 
-    var title     by remember { mutableStateOf("") }
-    var selectedType      by remember { mutableStateOf(EventType.ACADEMIC) }
-    // Custom types added in this session
-    var customTypes       by remember { mutableStateOf(listOf<EventTypeConfig>()) }
-    var selectedCustomCfg by remember { mutableStateOf<EventTypeConfig?>(null) }
-    var showCustomTypeDialog  by remember { mutableStateOf(false) }
-    var showCustomTypePicker  by remember { mutableStateOf(false) }
-    var startDate by remember { mutableStateOf(prefilledDate ?: "Feb 25, 2024") }
-    var endDate   by remember { mutableStateOf(prefilledDate ?: "Feb 25, 2024") }
+    val accent    = getAccentColor(currentTheme)
+    val bgColor   = getBackgroundColor(currentTheme)
+    val surfColor = getSurfaceColor(currentTheme)
+    val textColor = getTextColor(currentTheme)
+    val topBarBg  = getTopBarColor(currentTheme)
+    val topBarFg  = getTopBarContentColor(currentTheme)
+    val isDark    = currentTheme == AppTheme.DARK
+
+    var title        by remember { mutableStateOf(prefilledEvent?.title ?: "") }
+    var selectedType by remember { mutableStateOf(prefilledEvent?.type ?: EventType.ACADEMIC) }
+
+    var customTypes by remember {
+        mutableStateOf(
+            if (prefilledEvent?.customConfig != null) listOf(prefilledEvent.customConfig)
+            else listOf<EventTypeConfig>()
+        )
+    }
+    var selectedCustomCfg    by remember { mutableStateOf(prefilledEvent?.customConfig) }
+    var showCustomTypeDialog by remember { mutableStateOf(false) }
+    var showCustomTypePicker by remember { mutableStateOf(false) }
+
+    var startDate by remember { mutableStateOf(prefilledEvent?.dateTime ?: prefilledDate ?: "Feb 25, 2024") }
+    var endDate   by remember { mutableStateOf(prefilledEvent?.dateTime ?: prefilledDate ?: "Feb 25, 2024") }
     var startTime by remember { mutableStateOf("9:00 AM") }
     var endTime   by remember { mutableStateOf("10:00 AM") }
-    var notes     by remember { mutableStateOf("") }
+    var notes     by remember { mutableStateOf(prefilledEvent?.notes ?: "") }
     var isAllDay  by remember { mutableStateOf(false) }
 
-    // Notifications — each entry is a display label string
-    var notifications by remember { mutableStateOf(listOf<String>()) }
+    var notifications    by remember { mutableStateOf(listOf<String>()) }
     var showNotifPicker  by remember { mutableStateOf(false) }
     var showCustomDialog by remember { mutableStateOf(false) }
 
-    // Location
     var location by remember { mutableStateOf("") }
 
-    // Repeat
     var repeatOption     by remember { mutableStateOf("Does not repeat") }
     var showRepeatPicker by remember { mutableStateOf(false) }
     var showCustomRepeat by remember { mutableStateOf(false) }
@@ -156,7 +162,8 @@ fun AddEventScreen(
                 canSave        = title.isNotBlank(),
                 topBarBg       = topBarBg,
                 topBarFg       = topBarFg,
-                accent         = accent
+                accent         = accent,
+                isEditMode     = isEditMode
             )
         }
     ) { paddingValues ->
@@ -169,7 +176,6 @@ fun AddEventScreen(
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            // Title
             AddEventField(
                 value         = title,
                 onValueChange = { title = it },
@@ -181,7 +187,6 @@ fun AddEventScreen(
                 isDark        = isDark
             )
 
-            // Type selector
             AddEventTypeSelector(
                 selectedType      = selectedType,
                 onTypeSelected    = { type ->
@@ -201,36 +206,33 @@ fun AddEventScreen(
                 registry          = registry
             )
 
-            // Date / Time card — Google Calendar style
             DateTimeCard(
-                startDate      = startDate,
-                endDate        = endDate,
-                startTime      = startTime,
-                endTime        = endTime,
-                isAllDay       = isAllDay,
+                startDate        = startDate,
+                endDate          = endDate,
+                startTime        = startTime,
+                endTime          = endTime,
+                isAllDay         = isAllDay,
                 onStartDateClick = { showStartDatePicker = true },
                 onEndDateClick   = { showEndDatePicker   = true },
                 onStartTimeClick = { showStartTimePicker = true },
                 onEndTimeClick   = { showEndTimePicker   = true },
                 onAllDayChange   = { isAllDay = it },
-                accent         = accent,
-                surfColor      = surfColor,
-                textColor      = textColor,
-                isDark         = isDark
+                accent           = accent,
+                surfColor        = surfColor,
+                textColor        = textColor,
+                isDark           = isDark
             )
 
-            // Notifications card — Google Calendar style
             NotificationsCard(
-                notifications      = notifications,
-                onAddClick         = { showNotifPicker = true },
-                onRemove           = { label -> notifications = notifications - label },
-                accent             = accent,
-                surfColor          = surfColor,
-                textColor          = textColor,
-                isDark             = isDark
+                notifications = notifications,
+                onAddClick    = { showNotifPicker = true },
+                onRemove      = { label -> notifications = notifications - label },
+                accent        = accent,
+                surfColor     = surfColor,
+                textColor     = textColor,
+                isDark        = isDark
             )
 
-            // Location card
             LocationCard(
                 location      = location,
                 onValueChange = { location = it },
@@ -239,16 +241,14 @@ fun AddEventScreen(
                 textColor     = textColor
             )
 
-            // Repeat card
             RepeatCard(
-                repeatOption  = repeatOption,
-                onClick       = { showRepeatPicker = true },
-                accent        = accent,
-                surfColor     = surfColor,
-                textColor     = textColor
+                repeatOption = repeatOption,
+                onClick      = { showRepeatPicker = true },
+                accent       = accent,
+                surfColor    = surfColor,
+                textColor    = textColor
             )
 
-            // Notes
             AddEventNotesField(
                 value         = notes,
                 onValueChange = { notes = it },
@@ -262,15 +262,14 @@ fun AddEventScreen(
         }
     }
 
-    // Notification option picker
     if (showNotifPicker) {
         NotificationPickerDialog(
-            existing    = notifications,
-            accent      = accent,
-            surfColor   = surfColor,
-            textColor   = textColor,
-            onDismiss   = { showNotifPicker = false },
-            onSelect    = { value ->
+            existing  = notifications,
+            accent    = accent,
+            surfColor = surfColor,
+            textColor = textColor,
+            onDismiss = { showNotifPicker = false },
+            onSelect  = { value ->
                 if (value == "custom") {
                     showNotifPicker  = false
                     showCustomDialog = true
@@ -283,7 +282,6 @@ fun AddEventScreen(
         )
     }
 
-    // Custom notification time input
     if (showCustomDialog) {
         CustomNotificationDialog(
             accent    = accent,
@@ -297,18 +295,17 @@ fun AddEventScreen(
         )
     }
 
-    // Custom type picker — choose from existing or create new
     if (showCustomTypePicker) {
         CustomTypePickerSheet(
-            registry  = registry,
-            accent    = accent,
-            surfColor = surfColor,
-            textColor = textColor,
-            onDismiss = { showCustomTypePicker = false },
+            registry         = registry,
+            accent           = accent,
+            surfColor        = surfColor,
+            textColor        = textColor,
+            onDismiss        = { showCustomTypePicker = false },
             onSelectExisting = { cfg ->
-                customTypes       = if (!customTypes.contains(cfg)) customTypes + cfg else customTypes
-                selectedType      = EventType.CUSTOM
-                selectedCustomCfg = cfg
+                customTypes          = if (!customTypes.contains(cfg)) customTypes + cfg else customTypes
+                selectedType         = EventType.CUSTOM
+                selectedCustomCfg    = cfg
                 showCustomTypePicker = false
             },
             onCreateNew = {
@@ -318,9 +315,7 @@ fun AddEventScreen(
         )
     }
 
-    // Custom type dialog
     if (showCustomTypeDialog) {
-        // Reuse EditTypeDialog in "create" mode — blank name, default icon/color
         EditTypeDialog(
             initialLabel    = "",
             initialGradient = 3,
@@ -347,7 +342,6 @@ fun AddEventScreen(
         )
     }
 
-    // Repeat picker
     if (showRepeatPicker) {
         RepeatPickerDialog(
             current   = repeatOption,
@@ -380,16 +374,14 @@ fun AddEventScreen(
         )
     }
 
-    // Date pickers
     if (showStartDatePicker) {
         ThemedDatePickerDialog(
-            state    = startDatePickerState,
-            accent   = accent,
+            state     = startDatePickerState,
+            accent    = accent,
             onDismiss = { showStartDatePicker = false },
             onConfirm = {
                 startDatePickerState.selectedDateMillis?.let {
-                    val fmt = SimpleDateFormat("MMM dd, yyyy", Locale.US)
-                    val d   = fmt.format(Date(it))
+                    val d = SimpleDateFormat("MMM dd, yyyy", Locale.US).format(Date(it))
                     startDate = d
                     if (isAllDay) endDate = d
                 }
@@ -399,8 +391,8 @@ fun AddEventScreen(
     }
     if (showEndDatePicker) {
         ThemedDatePickerDialog(
-            state    = endDatePickerState,
-            accent   = accent,
+            state     = endDatePickerState,
+            accent    = accent,
             onDismiss = { showEndDatePicker = false },
             onConfirm = {
                 endDatePickerState.selectedDateMillis?.let {
@@ -412,8 +404,8 @@ fun AddEventScreen(
     }
     if (showStartTimePicker) {
         ThemedTimePickerDialog(
-            state    = startTimePickerState,
-            accent   = accent,
+            state     = startTimePickerState,
+            accent    = accent,
             onDismiss = { showStartTimePicker = false },
             onConfirm = {
                 startTime = formatTime(startTimePickerState.hour, startTimePickerState.minute)
@@ -423,8 +415,8 @@ fun AddEventScreen(
     }
     if (showEndTimePicker) {
         ThemedTimePickerDialog(
-            state    = endTimePickerState,
-            accent   = accent,
+            state     = endTimePickerState,
+            accent    = accent,
             onDismiss = { showEndTimePicker = false },
             onConfirm = {
                 endTime = formatTime(endTimePickerState.hour, endTimePickerState.minute)
@@ -445,7 +437,8 @@ fun AddEventTopBar(
     canSave: Boolean,
     topBarBg: Color,
     topBarFg: Color,
-    accent: Color
+    accent: Color,
+    isEditMode: Boolean = false
 ) {
     Surface(
         modifier        = Modifier
@@ -471,7 +464,7 @@ fun AddEventTopBar(
             }
 
             Text(
-                "New Event",
+                if (isEditMode) "Edit Event" else "New Event",
                 fontSize   = 20.sp,
                 fontWeight = FontWeight.Bold,
                 color      = topBarFg
@@ -484,7 +477,7 @@ fun AddEventTopBar(
                 shadowElevation = if (canSave) 3.dp else 0.dp
             ) {
                 Text(
-                    "Save",
+                    if (isEditMode) "Update" else "Save",
                     fontSize   = 16.sp,
                     fontWeight = FontWeight.Bold,
                     color      = if (canSave) White else White.copy(alpha = 0.6f),
@@ -574,21 +567,18 @@ fun AddEventTypeSelector(
     isDark: Boolean,
     registry: EventTypeRegistry = EventTypeRegistry()
 ) {
-    // 3 pinned defaults always visible + selected custom chips + add button
-    // All in one horizontal scrollable LazyRow
-    androidx.compose.foundation.lazy.LazyRow(
+    LazyRow(
         modifier              = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        // ── Pinned built-ins (always shown, use registry colors) ──
         val builtIns = listOf(registry.academic, registry.personal, registry.occasion)
         items(builtIns) { state ->
             val cfg = state.toConfig()
             AddEventTypeChip(
-                text      = state.label,
-                icon      = state.icon,
-                selected  = selectedType == state.type,
-                onClick   = { onTypeSelected(state.type) },
+                text          = state.label,
+                icon          = state.icon,
+                selected      = selectedType == state.type,
+                onClick       = { onTypeSelected(state.type) },
                 color         = cfg.gradientStart,
                 surfColor     = surfColor,
                 accent        = accent,
@@ -597,13 +587,12 @@ fun AddEventTypeSelector(
             )
         }
 
-        // ── Selected custom type chips (pinned after defaults) ──
         items(customTypes) { cfg ->
             AddEventTypeChip(
-                text      = cfg.label,
-                icon      = Icons.Default.Star,
-                selected  = selectedType == EventType.CUSTOM && selectedCustomCfg == cfg,
-                onClick   = { onCustomSelected(cfg) },
+                text          = cfg.label,
+                icon          = Icons.Default.Star,
+                selected      = selectedType == EventType.CUSTOM && selectedCustomCfg == cfg,
+                onClick       = { onCustomSelected(cfg) },
                 color         = cfg.gradientStart,
                 surfColor     = surfColor,
                 accent        = accent,
@@ -612,7 +601,6 @@ fun AddEventTypeSelector(
             )
         }
 
-        // ── + button — opens picker of all registry custom types ──
         item {
             Surface(
                 onClick         = onAddCustomClick,
@@ -641,10 +629,10 @@ fun AddEventTypeChip(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     selected: Boolean,
     onClick: () -> Unit,
-    color: Color,           // gradient/type specific color
+    color: Color,
     surfColor: Color,
     modifier: Modifier = Modifier,
-    accent: Color = Color(0xFF667eea),     // theme accent
+    accent: Color = Color(0xFF667eea),
     chipTextColor: Color = Color(0xFF1A1A1A)
 ) {
     val scale by animateFloatAsState(
@@ -658,34 +646,26 @@ fun AddEventTypeChip(
         modifier        = modifier
             .height(56.dp)
             .graphicsLayer { scaleX = scale; scaleY = scale },
-        shape           = RoundedCornerShape(13.dp), // Consistent with your Title/Notes fields
-        // Selection Logic: If selected, use the accent. Otherwise, use surfColor.
+        shape           = RoundedCornerShape(13.dp),
         color           = if (selected) accent else surfColor,
         shadowElevation = if (selected) 4.dp else 2.dp,
-        // Optional subtle border when unselected to match your "Add" button style
         border          = if (!selected) BorderStroke(1.dp, accent.copy(alpha = 0.1f)) else null
     ) {
         Column(
-            modifier              = Modifier.fillMaxSize(),
-            horizontalAlignment   = Alignment.CenterHorizontally,
-            verticalArrangement   = Arrangement.Center
+            modifier            = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
-            // Box removed. Icon now sits directly on the surface like your Repeat/Location icons.
             Icon(
-                icon,
-                null,
-                // Selected: White. Unselected: Theme accent.
+                icon, null,
                 tint     = if (selected) Color.White else accent,
-                modifier = Modifier.size(22.dp) // Matched to your other card icon sizes
+                modifier = Modifier.size(22.dp)
             )
-
             Spacer(Modifier.height(4.dp))
-
             Text(
                 text       = text,
                 fontSize   = 12.sp,
                 fontWeight = FontWeight.Bold,
-                // Selected: White. Unselected: Main text color.
                 color      = if (selected) Color.White else chipTextColor.copy(alpha = 0.8f),
                 maxLines   = 1
             )
@@ -694,7 +674,7 @@ fun AddEventTypeChip(
 }
 
 // ─────────────────────────────────────────────
-// Date / Time Card  (Google Calendar style)
+// Date / Time Card
 // ─────────────────────────────────────────────
 
 @Composable
@@ -714,8 +694,6 @@ fun DateTimeCard(
         modifier        = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(4.dp)) {
-
-            // All-day row
             Row(
                 modifier              = Modifier
                     .fillMaxWidth()
@@ -736,10 +714,7 @@ fun DateTimeCard(
                     )
                 )
             }
-
             GCalDivider(textColor)
-
-            // Start row
             GCalDateTimeRow(
                 date        = startDate,
                 time        = if (!isAllDay) startTime else null,
@@ -749,10 +724,7 @@ fun DateTimeCard(
                 textColor   = textColor,
                 isFirst     = true
             )
-
             GCalDivider(textColor)
-
-            // End row
             GCalDateTimeRow(
                 date        = endDate,
                 time        = if (!isAllDay) endTime else null,
@@ -777,34 +749,23 @@ private fun GCalDivider(textColor: Color) {
 
 @Composable
 private fun GCalDateTimeRow(
-    date: String,
-    time: String?,
-    onDateClick: () -> Unit,
-    onTimeClick: () -> Unit,
-    accent: Color,
-    textColor: Color,
-    isFirst: Boolean
+    date: String, time: String?,
+    onDateClick: () -> Unit, onTimeClick: () -> Unit,
+    accent: Color, textColor: Color, isFirst: Boolean
 ) {
     Row(
-        modifier              = Modifier
+        modifier          = Modifier
             .fillMaxWidth()
             .padding(horizontal = 14.dp, vertical = 2.dp),
-        verticalAlignment     = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        // Left label
         Text(
             if (isFirst) "Start" else "End",
-            fontSize  = 12.sp,
-            color     = textColor.copy(alpha = 0.45f),
-            modifier  = Modifier.width(36.dp)
+            fontSize = 12.sp,
+            color    = textColor.copy(alpha = 0.45f),
+            modifier = Modifier.width(36.dp)
         )
-
-        // Date chip
-        Surface(
-            onClick = onDateClick,
-            shape   = RoundedCornerShape(8.dp),
-            color   = accent.copy(alpha = 0.08f)
-        ) {
+        Surface(onClick = onDateClick, shape = RoundedCornerShape(8.dp), color = accent.copy(alpha = 0.08f)) {
             Text(
                 date,
                 fontSize   = 15.sp,
@@ -813,15 +774,9 @@ private fun GCalDateTimeRow(
                 modifier   = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)
             )
         }
-
         if (time != null) {
             Spacer(Modifier.width(8.dp))
-            // Time chip
-            Surface(
-                onClick = onTimeClick,
-                shape   = RoundedCornerShape(8.dp),
-                color   = Color.Transparent
-            ) {
+            Surface(onClick = onTimeClick, shape = RoundedCornerShape(8.dp), color = Color.Transparent) {
                 Text(
                     time,
                     fontSize   = 15.sp,
@@ -835,7 +790,7 @@ private fun GCalDateTimeRow(
 }
 
 // ─────────────────────────────────────────────
-// Notifications Card  (Google Calendar style)
+// Notifications Card
 // ─────────────────────────────────────────────
 
 @Composable
@@ -843,34 +798,15 @@ fun NotificationsCard(
     notifications: List<String>,
     onAddClick: () -> Unit,
     onRemove: (String) -> Unit,
-    accent: Color,
-    surfColor: Color,
-    textColor: Color,
-    isDark: Boolean
+    accent: Color, surfColor: Color, textColor: Color, isDark: Boolean
 ) {
-    Surface(
-        shape           = RoundedCornerShape(13.dp),
-        color           = surfColor,
-        shadowElevation = 2.dp,
-        modifier        = Modifier.fillMaxWidth()
-    ) {
+    Surface(shape = RoundedCornerShape(13.dp), color = surfColor, shadowElevation = 2.dp, modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(4.dp)) {
-
-            // Each existing notification row
             notifications.forEachIndexed { index, label ->
                 if (index > 0) GCalNotifDivider(textColor)
-                NotificationRow(
-                    label     = label,
-                    onRemove  = { onRemove(label) },
-                    accent    = accent,
-                    textColor = textColor
-                )
+                NotificationRow(label = label, onRemove = { onRemove(label) }, accent = accent, textColor = textColor)
             }
-
-            // Divider only if there were existing rows
             if (notifications.isNotEmpty()) GCalNotifDivider(textColor)
-
-            // "Add notification" row — always shown
             Row(
                 modifier              = Modifier
                     .fillMaxWidth()
@@ -879,17 +815,8 @@ fun NotificationsCard(
                 horizontalArrangement = Arrangement.spacedBy(14.dp),
                 verticalAlignment     = Alignment.CenterVertically
             ) {
-                Icon(
-                    Icons.Default.NotificationsNone,
-                    null,
-                    tint     = accent,
-                    modifier = Modifier.size(22.dp)
-                )
-                Text(
-                    "Add notification",
-                    fontSize = 16.sp,
-                    color    = accent
-                )
+                Icon(Icons.Default.NotificationsNone, null, tint = accent, modifier = Modifier.size(22.dp))
+                Text("Add notification", fontSize = 16.sp, color = accent)
             }
         }
     }
@@ -897,20 +824,11 @@ fun NotificationsCard(
 
 @Composable
 private fun GCalNotifDivider(textColor: Color) {
-    HorizontalDivider(
-        modifier  = Modifier.padding(horizontal = 14.dp),
-        color     = textColor.copy(alpha = 0.07f),
-        thickness = 1.dp
-    )
+    HorizontalDivider(modifier = Modifier.padding(horizontal = 14.dp), color = textColor.copy(alpha = 0.07f), thickness = 1.dp)
 }
 
 @Composable
-private fun NotificationRow(
-    label: String,
-    onRemove: () -> Unit,
-    accent: Color,
-    textColor: Color
-) {
+private fun NotificationRow(label: String, onRemove: () -> Unit, accent: Color, textColor: Color) {
     Row(
         modifier              = Modifier
             .fillMaxWidth()
@@ -918,25 +836,10 @@ private fun NotificationRow(
         horizontalArrangement = Arrangement.spacedBy(14.dp),
         verticalAlignment     = Alignment.CenterVertically
     ) {
-        Icon(
-            Icons.Default.Notifications,
-            null,
-            tint     = accent,
-            modifier = Modifier.size(22.dp)
-        )
-        Text(
-            label,
-            fontSize = 15.sp,
-            color    = textColor,
-            modifier = Modifier.weight(1f)
-        )
+        Icon(Icons.Default.Notifications, null, tint = accent, modifier = Modifier.size(22.dp))
+        Text(label, fontSize = 15.sp, color = textColor, modifier = Modifier.weight(1f))
         IconButton(onClick = onRemove, modifier = Modifier.size(32.dp)) {
-            Icon(
-                Icons.Default.Close,
-                "Remove",
-                tint     = textColor.copy(alpha = 0.4f),
-                modifier = Modifier.size(18.dp)
-            )
+            Icon(Icons.Default.Close, "Remove", tint = textColor.copy(alpha = 0.4f), modifier = Modifier.size(18.dp))
         }
     }
 }
@@ -947,26 +850,15 @@ private fun NotificationRow(
 
 @Composable
 fun NotificationPickerDialog(
-    existing: List<String>,
-    accent: Color,
-    surfColor: Color,
-    textColor: Color,
-    onDismiss: () -> Unit,
-    onSelect: (String) -> Unit
+    existing: List<String>, accent: Color, surfColor: Color, textColor: Color,
+    onDismiss: () -> Unit, onSelect: (String) -> Unit
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor   = surfColor,
         shape            = RoundedCornerShape(16.dp),
-        title = {
-            Text(
-                "Add notification",
-                fontSize   = 18.sp,
-                fontWeight = FontWeight.Bold,
-                color      = textColor
-            )
-        },
-        text = {
+        title  = { Text("Add notification", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = textColor) },
+        text   = {
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 standardNotificationOptions.forEach { option ->
                     val alreadyAdded = existing.contains(getNotificationLabel(option.value))
@@ -985,11 +877,7 @@ fun NotificationPickerDialog(
                             tint     = if (alreadyAdded) accent else textColor.copy(alpha = 0.45f),
                             modifier = Modifier.size(20.dp)
                         )
-                        Text(
-                            option.label,
-                            fontSize = 15.sp,
-                            color    = if (alreadyAdded) accent else textColor
-                        )
+                        Text(option.label, fontSize = 15.sp, color = if (alreadyAdded) accent else textColor)
                     }
                     if (option != standardNotificationOptions.last()) {
                         HorizontalDivider(color = textColor.copy(alpha = 0.06f))
@@ -997,11 +885,7 @@ fun NotificationPickerDialog(
                 }
             }
         },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel", color = accent, fontWeight = FontWeight.Bold)
-            }
-        }
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = accent, fontWeight = FontWeight.Bold) } }
     )
 }
 
@@ -1012,31 +896,22 @@ fun NotificationPickerDialog(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CustomNotificationDialog(
-    accent: Color,
-    surfColor: Color,
-    textColor: Color,
-    onDismiss: () -> Unit,
-    onConfirm: (String) -> Unit
+    accent: Color, surfColor: Color, textColor: Color,
+    onDismiss: () -> Unit, onConfirm: (String) -> Unit
 ) {
     var minutes by remember { mutableStateOf("") }
-    var unit    by remember { mutableStateOf("minutes") } // "minutes" | "hours" | "days"
+    var unit    by remember { mutableStateOf("minutes") }
     val units   = listOf("minutes", "hours", "days")
 
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor   = surfColor,
         shape            = RoundedCornerShape(16.dp),
-        title = {
-            Text("Custom notification", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = textColor)
-        },
-        text = {
+        title  = { Text("Custom notification", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = textColor) },
+        text   = {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Text("How long before the event?", fontSize = 14.sp, color = textColor.copy(alpha = 0.6f))
-
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalAlignment     = Alignment.CenterVertically
-                ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                     OutlinedTextField(
                         value         = minutes,
                         onValueChange = { if (it.length <= 3 && it.all(Char::isDigit)) minutes = it },
@@ -1044,30 +919,21 @@ fun CustomNotificationDialog(
                         singleLine    = true,
                         modifier      = Modifier.width(90.dp),
                         colors        = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = accent,
-                            focusedLabelColor  = accent,
-                            cursorColor        = accent,
-                            unfocusedTextColor = textColor,
-                            focusedTextColor   = textColor
+                            focusedBorderColor = accent, focusedLabelColor = accent,
+                            cursorColor = accent, unfocusedTextColor = textColor, focusedTextColor = textColor
                         )
                     )
-
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         units.forEach { u ->
                             Row(
-                                modifier          = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .clickable { unit = u }
+                                modifier = Modifier.clip(RoundedCornerShape(6.dp)).clickable { unit = u }
                                     .padding(horizontal = 10.dp, vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically,
+                                verticalAlignment     = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                RadioButton(
-                                    selected = unit == u,
-                                    onClick  = { unit = u },
-                                    colors   = RadioButtonDefaults.colors(selectedColor = accent),
-                                    modifier = Modifier.size(20.dp)
-                                )
+                                RadioButton(selected = unit == u, onClick = { unit = u },
+                                    colors = RadioButtonDefaults.colors(selectedColor = accent),
+                                    modifier = Modifier.size(20.dp))
                                 Text(u.replaceFirstChar { it.uppercase() }, fontSize = 14.sp, color = textColor)
                             }
                         }
@@ -1077,29 +943,15 @@ fun CustomNotificationDialog(
         },
         confirmButton = {
             Surface(
-                onClick = {
-                    if (minutes.isNotBlank()) {
-                        val label = "$minutes $unit before"
-                        onConfirm(label)
-                    }
-                },
-                shape = RoundedCornerShape(10.dp),
-                color = if (minutes.isNotBlank()) accent else accent.copy(alpha = 0.3f)
+                onClick = { if (minutes.isNotBlank()) onConfirm("$minutes $unit before") },
+                shape   = RoundedCornerShape(10.dp),
+                color   = if (minutes.isNotBlank()) accent else accent.copy(alpha = 0.3f)
             ) {
-                Text(
-                    "Add",
-                    fontSize   = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    color      = White,
-                    modifier   = Modifier.padding(horizontal = 18.dp, vertical = 9.dp)
-                )
+                Text("Add", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = White,
+                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 9.dp))
             }
         },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel", color = textColor.copy(alpha = 0.6f))
-            }
-        }
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = textColor.copy(alpha = 0.6f)) } }
     )
 }
 
@@ -1110,63 +962,31 @@ fun CustomNotificationDialog(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddEventNotesField(
-    value: String,
-    onValueChange: (String) -> Unit,
-    accent: Color,
-    surfColor: Color,
-    textColor: Color,
-    isDark: Boolean
+    value: String, onValueChange: (String) -> Unit,
+    accent: Color, surfColor: Color, textColor: Color, isDark: Boolean
 ) {
-    Surface(
-        shape           = RoundedCornerShape(13.dp),
-        color           = surfColor,
-        shadowElevation = 2.dp,
-        modifier        = Modifier.fillMaxWidth()
-    ) {
+    Surface(shape = RoundedCornerShape(13.dp), color = surfColor, shadowElevation = 2.dp, modifier = Modifier.fillMaxWidth()) {
         Row(
-            modifier              = Modifier
-                .fillMaxWidth()
-                .padding(14.dp),
+            modifier              = Modifier.fillMaxWidth().padding(14.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment     = Alignment.Top
         ) {
             Box(
-                modifier         = Modifier
-                    .size(38.dp)
-                    .clip(RoundedCornerShape(9.dp))
-                    .background(accent.copy(alpha = 0.12f)),
+                modifier         = Modifier.size(38.dp).clip(RoundedCornerShape(9.dp)).background(accent.copy(alpha = 0.12f)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    Icons.AutoMirrored.Filled.Notes,
-                    null,
-                    tint     = accent,
-                    modifier = Modifier.size(21.dp)
-                )
+                Icon(Icons.AutoMirrored.Filled.Notes, null, tint = accent, modifier = Modifier.size(21.dp))
             }
-
             TextField(
                 value         = value,
                 onValueChange = onValueChange,
-                placeholder   = {
-                    Text(
-                        "Add notes or location…",
-                        color    = textColor.copy(alpha = 0.35f),
-                        fontSize = 16.sp
-                    )
-                },
-                colors    = TextFieldDefaults.colors(
-                    focusedContainerColor   = Color.Transparent,
-                    unfocusedContainerColor = Color.Transparent,
-                    focusedIndicatorColor   = Color.Transparent,
-                    unfocusedIndicatorColor = Color.Transparent,
-                    cursorColor             = accent,
-                    unfocusedTextColor      = textColor,
-                    focusedTextColor        = textColor
+                placeholder   = { Text("Add notes or location…", color = textColor.copy(alpha = 0.35f), fontSize = 16.sp) },
+                colors        = TextFieldDefaults.colors(
+                    focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent,
+                    focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent,
+                    cursorColor = accent, unfocusedTextColor = textColor, focusedTextColor = textColor
                 ),
-                modifier  = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 70.dp, max = 130.dp),
+                modifier  = Modifier.fillMaxWidth().heightIn(min = 70.dp, max = 130.dp),
                 textStyle = androidx.compose.ui.text.TextStyle(fontSize = 16.sp, color = textColor)
             )
         }
@@ -1180,25 +1000,15 @@ fun AddEventNotesField(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ThemedDatePickerDialog(
-    state: DatePickerState,
-    accent: Color,
-    onDismiss: () -> Unit,
-    onConfirm: () -> Unit
+    state: DatePickerState, accent: Color,
+    onDismiss: () -> Unit, onConfirm: () -> Unit
 ) {
     DatePickerDialog(
         onDismissRequest = onDismiss,
-        confirmButton    = {
-            TextButton(onClick = onConfirm) {
-                Text("OK", color = accent, fontWeight = FontWeight.Bold)
-            }
-        },
-        dismissButton    = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel", color = accent)
-            }
-        },
-        colors = DatePickerDefaults.colors(containerColor = White),
-        shape  = RoundedCornerShape(16.dp)
+        confirmButton    = { TextButton(onClick = onConfirm) { Text("OK", color = accent, fontWeight = FontWeight.Bold) } },
+        dismissButton    = { TextButton(onClick = onDismiss) { Text("Cancel", color = accent) } },
+        colors           = DatePickerDefaults.colors(containerColor = White),
+        shape            = RoundedCornerShape(16.dp)
     ) {
         DatePicker(
             state  = state,
@@ -1214,41 +1024,29 @@ fun ThemedDatePickerDialog(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ThemedTimePickerDialog(
-    state: TimePickerState,
-    accent: Color,
-    onDismiss: () -> Unit,
-    onConfirm: () -> Unit
+    state: TimePickerState, accent: Color,
+    onDismiss: () -> Unit, onConfirm: () -> Unit
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor   = White,
         shape            = RoundedCornerShape(16.dp),
-        title            = {
-            Text("Select time", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1A1A1A))
-        },
+        title            = { Text("Select time", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1A1A1A)) },
         text = {
             TimePicker(
                 state  = state,
                 colors = TimePickerDefaults.colors(
-                    clockDialColor                    = Color(0xFFF5F5F5),
-                    selectorColor                     = accent,
-                    timeSelectorSelectedContainerColor = accent,
+                    clockDialColor                      = Color(0xFFF5F5F5),
+                    selectorColor                       = accent,
+                    timeSelectorSelectedContainerColor   = accent,
                     timeSelectorUnselectedContainerColor = Color(0xFFF5F5F5),
-                    timeSelectorSelectedContentColor  = White,
-                    timeSelectorUnselectedContentColor = Color(0xFF1A1A1A)
+                    timeSelectorSelectedContentColor     = White,
+                    timeSelectorUnselectedContentColor   = Color(0xFF1A1A1A)
                 )
             )
         },
-        confirmButton = {
-            TextButton(onClick = onConfirm) {
-                Text("OK", color = accent, fontWeight = FontWeight.Bold)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel", color = accent)
-            }
-        }
+        confirmButton = { TextButton(onClick = onConfirm) { Text("OK", color = accent, fontWeight = FontWeight.Bold) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = accent) } }
     )
 }
 
@@ -1259,55 +1057,27 @@ fun ThemedTimePickerDialog(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LocationCard(
-    location: String,
-    onValueChange: (String) -> Unit,
-    accent: Color,
-    surfColor: Color,
-    textColor: Color
+    location: String, onValueChange: (String) -> Unit,
+    accent: Color, surfColor: Color, textColor: Color
 ) {
-    Surface(
-        shape           = RoundedCornerShape(13.dp),
-        color           = surfColor,
-        shadowElevation = 2.dp,
-        modifier        = Modifier.fillMaxWidth()
-    ) {
+    Surface(shape = RoundedCornerShape(13.dp), color = surfColor, shadowElevation = 2.dp, modifier = Modifier.fillMaxWidth()) {
         Row(
-            modifier              = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 4.dp),
+            modifier              = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(14.dp),
             verticalAlignment     = Alignment.CenterVertically
         ) {
-            Icon(
-                Icons.Default.LocationOn,
-                null,
-                tint     = accent,
-                modifier = Modifier.size(22.dp)
-            )
+            Icon(Icons.Default.LocationOn, null, tint = accent, modifier = Modifier.size(22.dp))
             TextField(
                 value         = location,
                 onValueChange = onValueChange,
-                placeholder   = {
-                    Text(
-                        "Add location",
-                        color    = textColor.copy(alpha = 0.38f),
-                        fontSize = 16.sp
-                    )
-                },
-                colors    = TextFieldDefaults.colors(
-                    focusedContainerColor   = Color.Transparent,
-                    unfocusedContainerColor = Color.Transparent,
-                    focusedIndicatorColor   = Color.Transparent,
-                    unfocusedIndicatorColor = Color.Transparent,
-                    cursorColor             = accent,
-                    unfocusedTextColor      = textColor,
-                    focusedTextColor        = textColor
+                placeholder   = { Text("Add location", color = textColor.copy(alpha = 0.38f), fontSize = 16.sp) },
+                colors        = TextFieldDefaults.colors(
+                    focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent,
+                    focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent,
+                    cursorColor = accent, unfocusedTextColor = textColor, focusedTextColor = textColor
                 ),
                 modifier  = Modifier.fillMaxWidth(),
-                textStyle = androidx.compose.ui.text.TextStyle(
-                    fontSize = 16.sp,
-                    color    = textColor
-                ),
+                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 16.sp, color = textColor),
                 singleLine = true
             )
         }
@@ -1320,47 +1090,23 @@ fun LocationCard(
 
 @Composable
 fun RepeatCard(
-    repeatOption: String,
-    onClick: () -> Unit,
-    accent: Color,
-    surfColor: Color,
-    textColor: Color
+    repeatOption: String, onClick: () -> Unit,
+    accent: Color, surfColor: Color, textColor: Color
 ) {
-    Surface(
-        shape           = RoundedCornerShape(13.dp),
-        color           = surfColor,
-        shadowElevation = 2.dp,
-        modifier        = Modifier.fillMaxWidth()
-    ) {
+    Surface(shape = RoundedCornerShape(13.dp), color = surfColor, shadowElevation = 2.dp, modifier = Modifier.fillMaxWidth()) {
         Row(
-            modifier              = Modifier
-                .fillMaxWidth()
-                .clickable { onClick() }
-                .padding(horizontal = 14.dp, vertical = 16.dp),
+            modifier              = Modifier.fillMaxWidth().clickable { onClick() }.padding(horizontal = 14.dp, vertical = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(14.dp),
             verticalAlignment     = Alignment.CenterVertically
         ) {
-            Icon(
-                Icons.Default.Repeat,
-                null,
-                tint     = accent,
-                modifier = Modifier.size(22.dp)
-            )
+            Icon(Icons.Default.Repeat, null, tint = accent, modifier = Modifier.size(22.dp))
             Text(
                 repeatOption,
                 fontSize = 16.sp,
-                color    = if (repeatOption == "Does not repeat")
-                    textColor.copy(alpha = 0.55f)
-                else
-                    textColor,
+                color    = if (repeatOption == "Does not repeat") textColor.copy(alpha = 0.55f) else textColor,
                 modifier = Modifier.weight(1f)
             )
-            Icon(
-                Icons.Default.ExpandMore,
-                null,
-                tint     = textColor.copy(alpha = 0.35f),
-                modifier = Modifier.size(20.dp)
-            )
+            Icon(Icons.Default.ExpandMore, null, tint = textColor.copy(alpha = 0.35f), modifier = Modifier.size(20.dp))
         }
     }
 }
@@ -1370,88 +1116,46 @@ fun RepeatCard(
 // ─────────────────────────────────────────────
 
 private val repeatOptions = listOf(
-    "Does not repeat",
-    "Every day",
-    "Every week",
-    "Every month",
-    "Every year",
-    "Custom…"
+    "Does not repeat", "Every day", "Every week", "Every month", "Every year", "Custom…"
 )
 
 @Composable
 fun RepeatPickerDialog(
-    current: String,
-    accent: Color,
-    surfColor: Color,
-    textColor: Color,
-    onDismiss: () -> Unit,
-    onSelect: (String) -> Unit
+    current: String, accent: Color, surfColor: Color, textColor: Color,
+    onDismiss: () -> Unit, onSelect: (String) -> Unit
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor   = surfColor,
         shape            = RoundedCornerShape(16.dp),
-        title = {
-            Text(
-                "Repeat",
-                fontSize   = 18.sp,
-                fontWeight = FontWeight.Bold,
-                color      = textColor
-            )
-        },
-        text = {
+        title  = { Text("Repeat", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = textColor) },
+        text   = {
             Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
                 repeatOptions.forEach { option ->
                     val selected = option == current
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .clickable { onSelect(option) }
-                            .padding(horizontal = 4.dp, vertical = 14.dp),
+                        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))
+                            .clickable { onSelect(option) }.padding(horizontal = 4.dp, vertical = 14.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalAlignment     = Alignment.CenterVertically
                     ) {
-                        // Leading radio-style dot
-                        Box(
-                            modifier = Modifier
-                                .size(20.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            if (selected) {
-                                Icon(
-                                    Icons.Default.RadioButtonChecked,
-                                    null,
-                                    tint     = accent,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            } else {
-                                Icon(
-                                    Icons.Default.RadioButtonUnchecked,
-                                    null,
-                                    tint     = textColor.copy(alpha = 0.35f),
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
+                        Box(modifier = Modifier.size(20.dp), contentAlignment = Alignment.Center) {
+                            Icon(
+                                if (selected) Icons.Default.RadioButtonChecked else Icons.Default.RadioButtonUnchecked,
+                                null,
+                                tint     = if (selected) accent else textColor.copy(alpha = 0.35f),
+                                modifier = Modifier.size(20.dp)
+                            )
                         }
-                        Text(
-                            option,
-                            fontSize   = 15.sp,
+                        Text(option, fontSize = 15.sp,
                             fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
-                            color      = if (selected) accent else textColor
-                        )
+                            color      = if (selected) accent else textColor)
                     }
-                    if (option != repeatOptions.last()) {
-                        HorizontalDivider(color = textColor.copy(alpha = 0.06f))
-                    }
+                    if (option != repeatOptions.last()) HorizontalDivider(color = textColor.copy(alpha = 0.06f))
                 }
             }
         },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel", color = accent, fontWeight = FontWeight.Bold)
-            }
-        }
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = accent, fontWeight = FontWeight.Bold) } }
     )
 }
 
@@ -1462,63 +1166,36 @@ fun RepeatPickerDialog(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CustomRepeatDialog(
-    accent: Color,
-    surfColor: Color,
-    textColor: Color,
-    onDismiss: () -> Unit,
-    onConfirm: (String) -> Unit
+    accent: Color, surfColor: Color, textColor: Color,
+    onDismiss: () -> Unit, onConfirm: (String) -> Unit
 ) {
-    var every    by remember { mutableStateOf("1") }
-    var unit     by remember { mutableStateOf("week") }
-    val units    = listOf("day", "week", "month", "year")
-
-    // Derived label preview
+    var every by remember { mutableStateOf("1") }
+    var unit  by remember { mutableStateOf("week") }
+    val units = listOf("day", "week", "month", "year")
     val preview = if (every.isNotBlank() && every != "0") {
         val num = every.toIntOrNull() ?: 1
-        val unitLabel = if (num == 1) unit else "${unit}s"
-        "Every $every $unitLabel"
+        "Every $every ${if (num == 1) unit else "${unit}s"}"
     } else ""
 
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor   = surfColor,
         shape            = RoundedCornerShape(16.dp),
-        title = {
-            Text(
-                "Custom repeat",
-                fontSize   = 18.sp,
-                fontWeight = FontWeight.Bold,
-                color      = textColor
-            )
-        },
-        text = {
+        title  = { Text("Custom repeat", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = textColor) },
+        text   = {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Text(
-                    "Repeat every",
-                    fontSize = 14.sp,
-                    color    = textColor.copy(alpha = 0.6f)
-                )
-
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment     = Alignment.CenterVertically
-                ) {
-                    // Number input
+                Text("Repeat every", fontSize = 14.sp, color = textColor.copy(alpha = 0.6f))
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                     OutlinedTextField(
                         value         = every,
                         onValueChange = { if (it.length <= 2 && it.all(Char::isDigit)) every = it },
                         singleLine    = true,
                         modifier      = Modifier.width(72.dp),
                         colors        = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor  = accent,
-                            focusedLabelColor   = accent,
-                            cursorColor         = accent,
-                            unfocusedTextColor  = textColor,
-                            focusedTextColor    = textColor
+                            focusedBorderColor = accent, focusedLabelColor = accent,
+                            cursorColor = accent, unfocusedTextColor = textColor, focusedTextColor = textColor
                         )
                     )
-
-                    // Unit chips
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         units.forEach { u ->
                             val sel = unit == u
@@ -1528,27 +1205,15 @@ fun CustomRepeatDialog(
                                 color   = if (sel) accent else accent.copy(alpha = 0.08f),
                                 border  = if (!sel) BorderStroke(1.dp, accent.copy(alpha = 0.25f)) else null
                             ) {
-                                Text(
-                                    u.replaceFirstChar { it.uppercase() },
-                                    fontSize  = 12.sp,
+                                Text(u.replaceFirstChar { it.uppercase() }, fontSize = 12.sp,
                                     fontWeight = if (sel) FontWeight.Bold else FontWeight.Normal,
-                                    color     = if (sel) White else accent,
-                                    modifier  = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                                )
+                                    color = if (sel) White else accent,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp))
                             }
                         }
                     }
                 }
-
-                // Preview label
-                if (preview.isNotBlank()) {
-                    Text(
-                        preview,
-                        fontSize   = 13.sp,
-                        color      = accent,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
+                if (preview.isNotBlank()) Text(preview, fontSize = 13.sp, color = accent, fontWeight = FontWeight.Medium)
             }
         },
         confirmButton = {
@@ -1557,221 +1222,22 @@ fun CustomRepeatDialog(
                 shape   = RoundedCornerShape(10.dp),
                 color   = if (preview.isNotBlank()) accent else accent.copy(alpha = 0.3f)
             ) {
-                Text(
-                    "Done",
-                    fontSize   = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    color      = White,
-                    modifier   = Modifier.padding(horizontal = 18.dp, vertical = 9.dp)
-                )
+                Text("Done", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = White,
+                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 9.dp))
             }
         },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel", color = textColor.copy(alpha = 0.6f))
-            }
-        }
-    )
-}
-
-// ─────────────────────────────────────────────
-// Add Custom Type Dialog
-// ─────────────────────────────────────────────
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun AddCustomTypeDialog(
-    accent: Color,
-    surfColor: Color,
-    textColor: Color,
-    onDismiss: () -> Unit,
-    onConfirm: (EventTypeConfig) -> Unit
-) {
-    var typeName        by remember { mutableStateOf("") }
-    var selectedGradient by remember { mutableIntStateOf(3) } // default: blue
-
-    val chosen = gradientPalette[selectedGradient]
-    val previewTextColor  = textColorForGradient(chosen.first)
-    val previewBadgeColor = badgeColorForGradient(chosen.first, chosen.second)
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor   = surfColor,
-        shape            = RoundedCornerShape(20.dp),
-        title = {
-            Text(
-                "New Event Type",
-                fontSize   = 18.sp,
-                fontWeight = FontWeight.Bold,
-                color      = textColor
-            )
-        },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
-
-                // Name input
-                OutlinedTextField(
-                    value         = typeName,
-                    onValueChange = { if (it.length <= 16) typeName = it },
-                    label         = { Text("Type name") },
-                    placeholder   = { Text("e.g. Work, Health…") },
-                    singleLine    = true,
-                    modifier      = Modifier.fillMaxWidth(),
-                    colors        = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor  = accent,
-                        focusedLabelColor   = accent,
-                        cursorColor         = accent,
-                        unfocusedTextColor  = textColor,
-                        focusedTextColor    = textColor
-                    )
-                )
-
-                // Gradient picker
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        "Card color",
-                        fontSize = 13.sp,
-                        color    = textColor.copy(alpha = 0.6f)
-                    )
-
-                    // 2-row grid of gradient swatches
-                    val rows = gradientPalette.chunked(6)
-                    rows.forEach { row ->
-                        Row(
-                            modifier              = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            row.forEachIndexed { colIdx, pair ->
-                                val globalIdx = gradientPalette.indexOf(pair)
-                                val isSelected = selectedGradient == globalIdx
-                                Box(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .aspectRatio(1f)
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .background(
-                                            androidx.compose.ui.graphics.Brush.linearGradient(
-                                                listOf(pair.first, pair.second)
-                                            )
-                                        )
-                                        .then(
-                                            if (isSelected)
-                                                Modifier.border(
-                                                    2.5.dp,
-                                                    textColor,
-                                                    RoundedCornerShape(10.dp)
-                                                )
-                                            else Modifier
-                                        )
-                                        .clickable { selectedGradient = globalIdx },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    if (isSelected) {
-                                        Icon(
-                                            Icons.Default.Check,
-                                            null,
-                                            tint     = textColorForGradient(pair.first),
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Live preview card strip
-                if (typeName.isNotBlank()) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(44.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(
-                                androidx.compose.ui.graphics.Brush.linearGradient(
-                                    listOf(chosen.first, chosen.second)
-                                )
-                            )
-                            .padding(horizontal = 14.dp),
-                        contentAlignment = Alignment.CenterStart
-                    ) {
-                        Row(
-                            modifier              = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment     = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                typeName,
-                                fontSize   = 15.sp,
-                                fontWeight = FontWeight.Bold,
-                                color      = previewTextColor
-                            )
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(Color.White.copy(alpha = 0.85f))
-                                    .padding(horizontal = 8.dp, vertical = 3.dp)
-                            ) {
-                                Text(
-                                    typeName.uppercase().take(10),
-                                    fontSize      = 9.sp,
-                                    fontWeight    = FontWeight.Black,
-                                    color         = previewBadgeColor,
-                                    letterSpacing = 0.5.sp
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            Surface(
-                onClick = {
-                    if (typeName.isNotBlank()) {
-                        onConfirm(
-                            EventTypeConfig(
-                                type          = com.j4.eventify.components.EventType.CUSTOM,
-                                label         = typeName.uppercase().take(10),
-                                gradientStart = chosen.first,
-                                gradientEnd   = chosen.second,
-                                textColor     = previewTextColor,
-                                badgeColor    = previewBadgeColor
-                            )
-                        )
-                    }
-                },
-                shape = RoundedCornerShape(10.dp),
-                color = if (typeName.isNotBlank()) accent else accent.copy(alpha = 0.3f)
-            ) {
-                Text(
-                    "Create",
-                    fontSize   = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    color      = White,
-                    modifier   = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)
-                )
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel", color = textColor.copy(alpha = 0.6f))
-            }
-        }
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = textColor.copy(alpha = 0.6f)) } }
     )
 }
 
 // ─────────────────────────────────────────────
 // Custom Type Picker Sheet
-// Shows all custom types from registry + "Create new" option
 // ─────────────────────────────────────────────
 
 @Composable
 fun CustomTypePickerSheet(
     registry: EventTypeRegistry,
-    accent: Color,
-    surfColor: Color,
-    textColor: Color,
+    accent: Color, surfColor: Color, textColor: Color,
     onDismiss: () -> Unit,
     onSelectExisting: (EventTypeConfig) -> Unit,
     onCreateNew: () -> Unit
@@ -1780,102 +1246,51 @@ fun CustomTypePickerSheet(
         onDismissRequest = onDismiss,
         containerColor   = surfColor,
         shape            = RoundedCornerShape(20.dp),
-        title = {
-            Text(
-                "Add event type",
-                fontSize   = 18.sp,
-                fontWeight = FontWeight.Bold,
-                color      = textColor
-            )
-        },
-        text = {
+        title  = { Text("Add event type", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = textColor) },
+        text   = {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 if (registry.customTypes.isEmpty()) {
-                    Text(
-                        "No custom types yet. Create one!",
-                        fontSize = 14.sp,
-                        color    = textColor.copy(alpha = 0.5f),
-                        modifier = Modifier.padding(vertical = 8.dp)
-                    )
+                    Text("No custom types yet. Create one!", fontSize = 14.sp,
+                        color = textColor.copy(alpha = 0.5f), modifier = Modifier.padding(vertical = 8.dp))
                 } else {
-                    Text(
-                        "Your custom types",
-                        fontSize = 12.sp,
-                        color    = textColor.copy(alpha = 0.5f)
-                    )
+                    Text("Your custom types", fontSize = 12.sp, color = textColor.copy(alpha = 0.5f))
                     Spacer(Modifier.height(4.dp))
                     registry.customTypes.forEach { cfg ->
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(10.dp))
-                                .clickable { onSelectExisting(cfg) }
-                                .padding(horizontal = 8.dp, vertical = 12.dp),
+                            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
+                                .clickable { onSelectExisting(cfg) }.padding(horizontal = 8.dp, vertical = 12.dp),
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                             verticalAlignment     = Alignment.CenterVertically
                         ) {
-                            // Gradient dot
                             Box(
-                                modifier = Modifier
-                                    .size(28.dp)
-                                    .clip(CircleShape)
-                                    .background(
-                                        androidx.compose.ui.graphics.Brush.linearGradient(
-                                            listOf(cfg.gradientStart, cfg.gradientEnd)
-                                        )
-                                    )
+                                modifier = Modifier.size(28.dp).clip(CircleShape)
+                                    .background(androidx.compose.ui.graphics.Brush.linearGradient(
+                                        listOf(cfg.gradientStart, cfg.gradientEnd)))
                             )
-                            Text(
-                                cfg.label,
-                                fontSize  = 15.sp,
-                                color     = textColor,
-                                modifier  = Modifier.weight(1f)
-                            )
-                            Icon(
-                                Icons.Default.ChevronRight,
-                                null,
-                                tint     = textColor.copy(alpha = 0.3f),
-                                modifier = Modifier.size(18.dp)
-                            )
+                            Text(cfg.label, fontSize = 15.sp, color = textColor, modifier = Modifier.weight(1f))
+                            Icon(Icons.Default.ChevronRight, null, tint = textColor.copy(alpha = 0.3f), modifier = Modifier.size(18.dp))
                         }
                         HorizontalDivider(color = textColor.copy(alpha = 0.06f))
                     }
                 }
-
-                // Always show "Create new type" option
                 Spacer(Modifier.height(4.dp))
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(10.dp))
-                        .clickable { onCreateNew() }
-                        .padding(horizontal = 8.dp, vertical = 12.dp),
+                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
+                        .clickable { onCreateNew() }.padding(horizontal = 8.dp, vertical = 12.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalAlignment     = Alignment.CenterVertically
                 ) {
                     Box(
-                        modifier         = Modifier
-                            .size(28.dp)
-                            .clip(CircleShape)
-                            .background(accent.copy(alpha = 0.12f)),
+                        modifier         = Modifier.size(28.dp).clip(CircleShape).background(accent.copy(alpha = 0.12f)),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(Icons.Default.Add, null, tint = accent, modifier = Modifier.size(16.dp))
                     }
-                    Text(
-                        "Create new type",
-                        fontSize   = 15.sp,
-                        color      = accent,
-                        fontWeight = FontWeight.Medium,
-                        modifier   = Modifier.weight(1f)
-                    )
+                    Text("Create new type", fontSize = 15.sp, color = accent,
+                        fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
                 }
             }
         },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel", color = textColor.copy(alpha = 0.5f))
-            }
-        }
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = textColor.copy(alpha = 0.5f)) } }
     )
 }

@@ -15,9 +15,11 @@ import androidx.navigation.navArgument
 object Routes {
     const val HOME          = "home"
     const val ADD_EVENT     = "add_event"
+    const val EDIT_EVENT    = "edit_event"
     const val EVENT_DETAILS = "event_details"
 
     fun eventDetails(eventId: Int) = "event_details/$eventId"
+    fun editEvent(eventId: Int)    = "edit_event/$eventId"
 }
 
 @Composable
@@ -73,6 +75,28 @@ fun EventifyNavigation() {
             )
         }
 
+        // ── Edit Event ───────────────────────────────────────────
+        composable(
+            route     = "${Routes.EDIT_EVENT}/{eventId}",
+            arguments = listOf(navArgument("eventId") { type = NavType.IntType })
+        ) { backStackEntry ->
+            val eventId = backStackEntry.arguments?.getInt("eventId") ?: 0
+            val event   = DummyData.events.find { it.id == eventId }
+
+            if (event != null) {
+                AddEventScreen(
+                    registry       = registry,
+                    prefilledEvent = event,
+                    currentTheme   = currentTheme,
+                    onNavigateBack = { navController.popBackStack() },
+                    onSaveEvent    = { _, _, _, _, _ ->
+                        // TODO: update in database
+                        navController.popBackStack()
+                    }
+                )
+            }
+        }
+
         // ── Event Details ─────────────────────────────────────
         composable(
             route     = "${Routes.EVENT_DETAILS}/{eventId}",
@@ -85,8 +109,9 @@ fun EventifyNavigation() {
                 CountdownTimerScreen(
                     event          = event,
                     onNavigateBack = { navController.popBackStack() },
-                    onEdit         = { navController.navigate(Routes.ADD_EVENT) },
-                    onDelete       = { }
+                    onEdit         = { navController.navigate(Routes.editEvent(eventId)) },
+                    onDelete       = { },
+                    registry       = registry
                 )
             }
         }

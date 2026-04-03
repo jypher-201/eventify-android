@@ -199,16 +199,17 @@ fun CalendarView(
                                                 it.year  == currentYear
                                     }
                                     ModernDayCell(
-                                        day         = currentDay,
-                                        isToday     = currentDay   == todayDay   &&
+                                        day            = currentDay,
+                                        isToday        = currentDay   == todayDay   &&
                                                 currentMonth == todayMonth &&
                                                 currentYear  == todayYear,
-                                        isSelected  = currentDay == selectedDay,
-                                        events      = eventsOnDay,
-                                        onClick     = { selectedDay = currentDay },
-                                        modifier    = Modifier.weight(1f),
-                                        accentColor = accentColor,
-                                        textColor   = textColor
+                                        isSelected     = currentDay == selectedDay,
+                                        events         = eventsOnDay,
+                                        onClick        = { selectedDay = currentDay },
+                                        modifier       = Modifier.weight(1f),
+                                        accentColor    = accentColor,
+                                        textColor      = textColor,
+                                        configResolver = configResolver
                                     )
                                     dayCounter++
                                 } else {
@@ -275,7 +276,8 @@ fun ModernDayCell(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     accentColor: Color = Color(0xFF667eea),
-    textColor: Color   = Color(0xFF1A1A1A)
+    textColor: Color   = Color(0xFF1A1A1A),
+    configResolver: ((Event) -> com.j4.eventify.components.EventTypeConfig)? = null
 ) {
     Box(
         modifier = modifier
@@ -322,12 +324,13 @@ fun ModernDayCell(
                     horizontalArrangement = Arrangement.spacedBy(1.dp)
                 ) {
                     events.take(3).forEach { calEvent ->
-                        val dotColor = when (calEvent.event.type) {
-                            EventType.ACADEMIC -> Color(0xFF667eea)
-                            EventType.PERSONAL -> Color(0xFFf093fb)
-                            EventType.OCCASION -> Color(0xFFfcb69f)
-                            EventType.CUSTOM   -> calEvent.event.customConfig?.gradientStart ?: accentColor
-                        }
+                        val dotColor = configResolver?.invoke(calEvent.event)?.gradientStart
+                            ?: when (calEvent.event.type) {
+                                EventType.ACADEMIC -> Color(0xFF667eea)
+                                EventType.PERSONAL -> Color(0xFFf093fb)
+                                EventType.OCCASION -> Color(0xFFfcb69f)
+                                EventType.CUSTOM   -> calEvent.event.customConfig?.gradientStart ?: accentColor
+                            }
                         Box(
                             modifier = Modifier
                                 .weight(1f)
