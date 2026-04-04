@@ -1,6 +1,7 @@
 package com.j4.eventify
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.*
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -33,7 +34,7 @@ enum class BuiltInIcon {
             SPORTS   -> Icons.Default.Sports
             MUSIC    -> Icons.Default.MusicNote
             HEART    -> Icons.Default.Favorite
-            BOOK     -> Icons.Default.MenuBook
+            BOOK     -> Icons.AutoMirrored.Filled.MenuBook
             FLIGHT   -> Icons.Default.Flight
             CAMERA   -> Icons.Default.CameraAlt
             SHOPPING -> Icons.Default.ShoppingCart
