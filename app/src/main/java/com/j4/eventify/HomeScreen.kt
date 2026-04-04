@@ -937,7 +937,7 @@ fun ModernAboutDialog(
                 }
                 HorizontalDivider(color = textColor.copy(alpha = 0.1f))
                 Text(
-                    "© 2024 J⁴ Team",
+                    "© 2026 J⁴ Team",
                     fontSize  = 13.sp,
                     color     = textColor.copy(alpha = 0.5f),
                     textAlign = TextAlign.Center,
