@@ -151,8 +151,7 @@ fun HomeScreen(
 
     val isFiltered = selectedFilter != null ||
             searchQuery.isNotBlank() ||
-            timeFilter != TimeFilter.ALL ||
-            selectedCalendarDate != null
+            timeFilter != TimeFilter.ALL
 
 
     ModalNavigationDrawer(
