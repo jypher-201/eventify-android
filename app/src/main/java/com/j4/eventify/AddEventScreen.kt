@@ -375,10 +375,13 @@ fun AddEventScreen(
         )
     }
 
+    // 1. Start Date Picker
     if (showStartDatePicker) {
         ThemedDatePickerDialog(
-            state     = startDatePickerState,
-            accent    = accent,
+            state = startDatePickerState,
+            accent = accent,
+            surfColor = surfColor,
+            textColor = textColor,
             onDismiss = { showStartDatePicker = false },
             onConfirm = {
                 startDatePickerState.selectedDateMillis?.let {
@@ -390,10 +393,14 @@ fun AddEventScreen(
             }
         )
     }
+
+    // 2. End Date Picker
     if (showEndDatePicker) {
         ThemedDatePickerDialog(
-            state     = endDatePickerState,
-            accent    = accent,
+            state = endDatePickerState,
+            accent = accent,
+            surfColor = surfColor,
+            textColor = textColor,
             onDismiss = { showEndDatePicker = false },
             onConfirm = {
                 endDatePickerState.selectedDateMillis?.let {
@@ -403,10 +410,15 @@ fun AddEventScreen(
             }
         )
     }
+
+    // 3. Start Time Picker
     if (showStartTimePicker) {
         ThemedTimePickerDialog(
-            state     = startTimePickerState,
-            accent    = accent,
+            state = startTimePickerState,
+            accent = accent,
+            surfColor = surfColor,
+            textColor = textColor,
+            isDark = isDark,
             onDismiss = { showStartTimePicker = false },
             onConfirm = {
                 startTime = formatTime(startTimePickerState.hour, startTimePickerState.minute)
@@ -414,10 +426,15 @@ fun AddEventScreen(
             }
         )
     }
+
+    // 4. End Time Picker
     if (showEndTimePicker) {
         ThemedTimePickerDialog(
-            state     = endTimePickerState,
-            accent    = accent,
+            state = endTimePickerState,
+            accent = accent,
+            surfColor = surfColor,
+            textColor = textColor,
+            isDark = isDark,
             onDismiss = { showEndTimePicker = false },
             onConfirm = {
                 endTime = formatTime(endTimePickerState.hour, endTimePickerState.minute)
@@ -1017,28 +1034,43 @@ fun AddEventNotesField(
 }
 
 // ─────────────────────────────────────────────
-// Date / Time Pickers
+// Date / Time Pickers (FIXED)
 // ─────────────────────────────────────────────
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ThemedDatePickerDialog(
-    state: DatePickerState, accent: Color,
-    onDismiss: () -> Unit, onConfirm: () -> Unit
+    state: DatePickerState,
+    accent: Color,
+    surfColor: Color, // Added parameter
+    textColor: Color, // Added parameter
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
 ) {
     DatePickerDialog(
         onDismissRequest = onDismiss,
-        confirmButton    = { TextButton(onClick = onConfirm) { Text("OK", color = accent, fontWeight = FontWeight.Bold) } },
-        dismissButton    = { TextButton(onClick = onDismiss) { Text("Cancel", color = accent) } },
-        colors           = DatePickerDefaults.colors(containerColor = White),
-        shape            = RoundedCornerShape(16.dp)
+        confirmButton = { TextButton(onClick = onConfirm) { Text("OK", color = accent, fontWeight = FontWeight.Bold) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = accent) } },
+        colors = DatePickerDefaults.colors(containerColor = surfColor),
+        shape = RoundedCornerShape(16.dp)
     ) {
         DatePicker(
-            state  = state,
+            state = state,
             colors = DatePickerDefaults.colors(
+                containerColor = surfColor,
+                titleContentColor = textColor,
+                headlineContentColor = textColor,
+                weekdayContentColor = textColor.copy(alpha = 0.6f),
+                subheadContentColor = textColor.copy(alpha = 0.6f),
+                yearContentColor = textColor,
+                currentYearContentColor = accent,
+                selectedYearContentColor = Color.White,
+                selectedYearContainerColor = accent,
+                dayContentColor = textColor,
                 selectedDayContainerColor = accent,
-                todayContentColor         = accent,
-                todayDateBorderColor      = accent
+                selectedDayContentColor = Color.White,
+                todayContentColor = accent,
+                todayDateBorderColor = accent
             )
         )
     }
@@ -1047,24 +1079,36 @@ fun ThemedDatePickerDialog(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ThemedTimePickerDialog(
-    state: TimePickerState, accent: Color,
-    onDismiss: () -> Unit, onConfirm: () -> Unit
+    state: TimePickerState,
+    accent: Color,
+    surfColor: Color, // Added parameter
+    textColor: Color, // Added parameter
+    isDark: Boolean,  // Added parameter
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor   = White,
-        shape            = RoundedCornerShape(16.dp),
-        title            = { Text("Select time", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1A1A1A)) },
+        containerColor = surfColor,
+        shape = RoundedCornerShape(16.dp),
+        title = { Text("Select time", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = textColor) },
         text = {
             TimePicker(
-                state  = state,
+                state = state,
                 colors = TimePickerDefaults.colors(
-                    clockDialColor                      = Color(0xFFF5F5F5),
-                    selectorColor                       = accent,
-                    timeSelectorSelectedContainerColor   = accent,
-                    timeSelectorUnselectedContainerColor = Color(0xFFF5F5F5),
-                    timeSelectorSelectedContentColor     = White,
-                    timeSelectorUnselectedContentColor   = Color(0xFF1A1A1A)
+                    clockDialColor = if (isDark) textColor.copy(alpha = 0.05f) else Color(0xFFF5F5F5),
+                    clockDialSelectedContentColor = Color.White,
+                    clockDialUnselectedContentColor = textColor,
+                    selectorColor = accent,
+                    periodSelectorBorderColor = accent,
+                    periodSelectorSelectedContainerColor = accent.copy(alpha = 0.2f),
+                    periodSelectorUnselectedContainerColor = Color.Transparent,
+                    periodSelectorSelectedContentColor = accent,
+                    periodSelectorUnselectedContentColor = textColor,
+                    timeSelectorSelectedContainerColor = accent,
+                    timeSelectorUnselectedContainerColor = if (isDark) textColor.copy(alpha = 0.05f) else Color(0xFFF5F5F5),
+                    timeSelectorSelectedContentColor = Color.White,
+                    timeSelectorUnselectedContentColor = textColor
                 )
             )
         },
