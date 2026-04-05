@@ -1,12 +1,8 @@
 package com.j4.eventify
 
 import androidx.compose.animation.core.*
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -33,9 +29,6 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.ui.graphics.SolidColor
 import com.j4.eventify.components.EventCard
 import com.j4.eventify.components.EventType
-import com.j4.eventify.EventTypeRegistry
-import com.j4.eventify.BuiltInTypeState
-import com.j4.eventify.BuiltInIcon
 import com.j4.eventify.ui.theme.*
 import kotlinx.coroutines.launch
 
@@ -156,6 +149,12 @@ fun HomeScreen(
         timeFiltered.sortedBy { it.countdownNumber.toIntOrNull() ?: 999 }
     }
 
+    val isFiltered = selectedFilter != null ||
+            searchQuery.isNotBlank() ||
+            timeFilter != TimeFilter.ALL ||
+            selectedCalendarDate != null
+
+
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
@@ -196,8 +195,9 @@ fun HomeScreen(
                             selectedFilter = null
                             searchQuery    = ""
                             timeFilter     = TimeFilter.ALL
-                            viewMode       = ViewMode.LIST
+                            selectedCalendarDate = null
                         },
+                        isFiltered = isFiltered,
                         topBarColor        = topBarColor,
                         topBarContentColor = topBarContentColor,
                         surfaceColor       = surfaceColor,
@@ -324,6 +324,7 @@ fun ModernTopBar(
     onShowTimeFilterMenuChange: (Boolean) -> Unit,
     onMenuClick: () -> Unit,
     onResetClick: () -> Unit,
+    isFiltered: Boolean,
     topBarColor: Color,
     topBarContentColor: Color,
     surfaceColor: Color,
@@ -534,14 +535,22 @@ fun ModernTopBar(
                 }
 
                 // Reset — matches bar content colour
-                IconButton(onClick = onResetClick, modifier = Modifier.size(44.dp)) {
+                IconButton(
+                    onClick = onResetClick,
+                    modifier = Modifier.size(44.dp),
+                    enabled = isFiltered // ✅ disables click when false
+                ) {
                     Icon(
                         Icons.Default.Refresh,
                         contentDescription = "Reset filters",
-                        tint               = topBarContentColor,
-                        modifier           = Modifier.size(22.dp)
+                        tint = if (isFiltered)
+                            topBarContentColor
+                        else
+                            topBarContentColor.copy(alpha = 0.35f), // 🌫️ faded
+                        modifier = Modifier.size(22.dp)
                     )
                 }
+
             }
         }
 

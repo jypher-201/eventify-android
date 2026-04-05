@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -774,18 +775,25 @@ private fun GCalDateTimeRow(
                 modifier   = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)
             )
         }
+
+        Spacer(modifier = Modifier.weight(1f))
+
         if (time != null) {
-            Spacer(Modifier.width(8.dp))
-            Surface(onClick = onTimeClick, shape = RoundedCornerShape(8.dp), color = Color.Transparent) {
+            Surface(
+                onClick = onTimeClick,
+                shape = RoundedCornerShape(8.dp),
+                color = Color.Transparent
+            ) {
                 Text(
                     time,
-                    fontSize   = 15.sp,
+                    fontSize = 15.sp,
                     fontWeight = FontWeight.Medium,
-                    color      = textColor.copy(alpha = 0.65f),
-                    modifier   = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)
+                    color = textColor.copy(alpha = 0.65f),
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)
                 )
             }
         }
+
     }
 }
 
@@ -906,35 +914,50 @@ fun CustomNotificationDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor   = surfColor,
-        shape            = RoundedCornerShape(16.dp),
-        title  = { Text("Custom notification", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = textColor) },
+        shape            = RoundedCornerShape(20.dp),
+        title  = { Text("Custom notification", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = textColor) },
         text   = {
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Text("How long before the event?", fontSize = 14.sp, color = textColor.copy(alpha = 0.6f))
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedTextField(
-                        value         = minutes,
-                        onValueChange = { if (it.length <= 3 && it.all(Char::isDigit)) minutes = it },
-                        label         = { Text("Amount") },
-                        singleLine    = true,
-                        modifier      = Modifier.width(90.dp),
-                        colors        = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = accent, focusedLabelColor = accent,
-                            cursorColor = accent, unfocusedTextColor = textColor, focusedTextColor = textColor
-                        )
+            Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                Text("How long before the event?", fontSize = 15.sp, color = textColor.copy(alpha = 0.6f))
+
+                // Number input full width
+                OutlinedTextField(
+                    value         = minutes,
+                    onValueChange = { if (it.length <= 3 && it.all(Char::isDigit)) minutes = it },
+                    label         = { Text("Amount", fontSize = 14.sp) },
+                    singleLine    = true,
+                    modifier      = Modifier.fillMaxWidth(),
+                    textStyle     = androidx.compose.ui.text.TextStyle(fontSize = 16.sp, color = textColor),
+                    colors        = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = accent, focusedLabelColor = accent,
+                        cursorColor = accent, unfocusedTextColor = textColor, focusedTextColor = textColor
                     )
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                )
+
+                // Unit options as row of chips
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("Unit", fontSize = 13.sp, color = textColor.copy(alpha = 0.5f))
+                    Row(
+                        modifier              = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
                         units.forEach { u ->
-                            Row(
-                                modifier = Modifier.clip(RoundedCornerShape(6.dp)).clickable { unit = u }
-                                    .padding(horizontal = 10.dp, vertical = 4.dp),
-                                verticalAlignment     = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            val sel = unit == u
+                            Surface(
+                                onClick  = { unit = u },
+                                shape    = RoundedCornerShape(20.dp),
+                                color    = if (sel) accent else accent.copy(alpha = 0.08f),
+                                border   = if (!sel) BorderStroke(1.dp, accent.copy(alpha = 0.3f)) else null,
+                                modifier = Modifier.weight(1f)
                             ) {
-                                RadioButton(selected = unit == u, onClick = { unit = u },
-                                    colors = RadioButtonDefaults.colors(selectedColor = accent),
-                                    modifier = Modifier.size(20.dp))
-                                Text(u.replaceFirstChar { it.uppercase() }, fontSize = 14.sp, color = textColor)
+                                Text(
+                                    u.replaceFirstChar { it.uppercase() },
+                                    fontSize   = 13.sp,
+                                    fontWeight = if (sel) FontWeight.Bold else FontWeight.Normal,
+                                    color      = if (sel) White else accent,
+                                    modifier   = Modifier.padding(vertical = 10.dp),
+                                    textAlign  = androidx.compose.ui.text.style.TextAlign.Center
+                                )
                             }
                         }
                     }
@@ -947,11 +970,11 @@ fun CustomNotificationDialog(
                 shape   = RoundedCornerShape(10.dp),
                 color   = if (minutes.isNotBlank()) accent else accent.copy(alpha = 0.3f)
             ) {
-                Text("Add", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = White,
-                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 9.dp))
+                Text("Add", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = White,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 11.dp))
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = textColor.copy(alpha = 0.6f)) } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", fontSize = 15.sp, color = textColor.copy(alpha = 0.6f)) } }
     )
 }
 
@@ -1180,40 +1203,71 @@ fun CustomRepeatDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor   = surfColor,
-        shape            = RoundedCornerShape(16.dp),
-        title  = { Text("Custom repeat", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = textColor) },
+        shape            = RoundedCornerShape(20.dp),
+        title  = { Text("Custom repeat", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = textColor) },
         text   = {
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Text("Repeat every", fontSize = 14.sp, color = textColor.copy(alpha = 0.6f))
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedTextField(
-                        value         = every,
-                        onValueChange = { if (it.length <= 2 && it.all(Char::isDigit)) every = it },
-                        singleLine    = true,
-                        modifier      = Modifier.width(72.dp),
-                        colors        = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = accent, focusedLabelColor = accent,
-                            cursorColor = accent, unfocusedTextColor = textColor, focusedTextColor = textColor
-                        )
+            Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                Text("Repeat every", fontSize = 15.sp, color = textColor.copy(alpha = 0.6f))
+
+                // Number input full width
+                OutlinedTextField(
+                    value         = every,
+                    onValueChange = { if (it.length <= 2 && it.all(Char::isDigit)) every = it },
+                    label         = { Text("Every", fontSize = 14.sp) },
+                    singleLine    = true,
+                    modifier      = Modifier.fillMaxWidth(),
+                    textStyle     = androidx.compose.ui.text.TextStyle(fontSize = 16.sp, color = textColor),
+                    colors        = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = accent, focusedLabelColor = accent,
+                        cursorColor = accent, unfocusedTextColor = textColor, focusedTextColor = textColor
                     )
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                )
+
+                // Unit chips — 4 equal chips in a single row
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("Unit", fontSize = 13.sp, color = textColor.copy(alpha = 0.5f))
+                    Row(
+                        modifier              = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
                         units.forEach { u ->
                             val sel = unit == u
                             Surface(
-                                onClick = { unit = u },
-                                shape   = RoundedCornerShape(20.dp),
-                                color   = if (sel) accent else accent.copy(alpha = 0.08f),
-                                border  = if (!sel) BorderStroke(1.dp, accent.copy(alpha = 0.25f)) else null
+                                onClick  = { unit = u },
+                                shape    = RoundedCornerShape(20.dp),
+                                color    = if (sel) accent else accent.copy(alpha = 0.08f),
+                                border   = if (!sel) BorderStroke(1.dp, accent.copy(alpha = 0.3f)) else null,
+                                modifier = Modifier.weight(1f)
                             ) {
-                                Text(u.replaceFirstChar { it.uppercase() }, fontSize = 12.sp,
+                                Text(
+                                    u.replaceFirstChar { it.uppercase() },
+                                    fontSize   = 13.sp,
                                     fontWeight = if (sel) FontWeight.Bold else FontWeight.Normal,
-                                    color = if (sel) White else accent,
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp))
+                                    color      = if (sel) White else accent,
+                                    modifier   = Modifier.padding(vertical = 10.dp),
+                                    textAlign  = androidx.compose.ui.text.style.TextAlign.Center
+                                )
                             }
                         }
                     }
                 }
-                if (preview.isNotBlank()) Text(preview, fontSize = 13.sp, color = accent, fontWeight = FontWeight.Medium)
+
+                // Live preview
+                if (preview.isNotBlank()) {
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = accent.copy(alpha = 0.1f),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            preview,
+                            fontSize   = 15.sp,
+                            color      = accent,
+                            fontWeight = FontWeight.Medium,
+                            modifier   = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
+                        )
+                    }
+                }
             }
         },
         confirmButton = {
@@ -1222,11 +1276,11 @@ fun CustomRepeatDialog(
                 shape   = RoundedCornerShape(10.dp),
                 color   = if (preview.isNotBlank()) accent else accent.copy(alpha = 0.3f)
             ) {
-                Text("Done", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = White,
-                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 9.dp))
+                Text("Done", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = White,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 11.dp))
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = textColor.copy(alpha = 0.6f)) } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", fontSize = 15.sp, color = textColor.copy(alpha = 0.6f)) } }
     )
 }
 
@@ -1246,14 +1300,14 @@ fun CustomTypePickerSheet(
         onDismissRequest = onDismiss,
         containerColor   = surfColor,
         shape            = RoundedCornerShape(20.dp),
-        title  = { Text("Add event type", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = textColor) },
+        title  = { Text("Add event type", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = textColor) },
         text   = {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 if (registry.customTypes.isEmpty()) {
-                    Text("No custom types yet. Create one!", fontSize = 14.sp,
+                    Text("No custom types yet. Create one!", fontSize = 15.sp,
                         color = textColor.copy(alpha = 0.5f), modifier = Modifier.padding(vertical = 8.dp))
                 } else {
-                    Text("Your custom types", fontSize = 12.sp, color = textColor.copy(alpha = 0.5f))
+                    Text("Your custom types", fontSize = 13.sp, color = textColor.copy(alpha = 0.5f))
                     Spacer(Modifier.height(4.dp))
                     registry.customTypes.forEach { cfg ->
                         Row(
@@ -1263,11 +1317,11 @@ fun CustomTypePickerSheet(
                             verticalAlignment     = Alignment.CenterVertically
                         ) {
                             Box(
-                                modifier = Modifier.size(28.dp).clip(CircleShape)
+                                modifier = Modifier.size(34.dp).clip(CircleShape)
                                     .background(androidx.compose.ui.graphics.Brush.linearGradient(
                                         listOf(cfg.gradientStart, cfg.gradientEnd)))
                             )
-                            Text(cfg.label, fontSize = 15.sp, color = textColor, modifier = Modifier.weight(1f))
+                            Text(cfg.label, fontSize = 16.sp, color = textColor, modifier = Modifier.weight(1f))
                             Icon(Icons.Default.ChevronRight, null, tint = textColor.copy(alpha = 0.3f), modifier = Modifier.size(18.dp))
                         }
                         HorizontalDivider(color = textColor.copy(alpha = 0.06f))
@@ -1281,16 +1335,16 @@ fun CustomTypePickerSheet(
                     verticalAlignment     = Alignment.CenterVertically
                 ) {
                     Box(
-                        modifier         = Modifier.size(28.dp).clip(CircleShape).background(accent.copy(alpha = 0.12f)),
+                        modifier         = Modifier.size(34.dp).clip(CircleShape).background(accent.copy(alpha = 0.12f)),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(Icons.Default.Add, null, tint = accent, modifier = Modifier.size(16.dp))
                     }
-                    Text("Create new type", fontSize = 15.sp, color = accent,
+                    Text("Create new type", fontSize = 16.sp, color = accent,
                         fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = textColor.copy(alpha = 0.5f)) } }
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Cancel", fontSize = 15.sp, color = textColor.copy(alpha = 0.5f)) } }
     )
 }
