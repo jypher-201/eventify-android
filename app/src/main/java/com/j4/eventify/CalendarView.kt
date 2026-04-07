@@ -30,6 +30,11 @@ import java.util.Calendar
 // Data
 // ─────────────────────────────────────────────
 
+// Cached once at class-load time — TimeZone.getTimeZone() does a disk read
+// and is expensive to call repeatedly.
+private val philippinesZone: java.util.TimeZone =
+    java.util.TimeZone.getTimeZone("Asia/Manila")
+
 data class CalendarEvent(
     val event: Event,
     val day: Int,
@@ -38,10 +43,11 @@ data class CalendarEvent(
 )
 
 fun mapEventsToDays(events: List<Event>): List<CalendarEvent> {
-    val philippinesZone = java.util.TimeZone.getTimeZone("Asia/Manila")
+    // Base calendar created once; each event clones it to avoid repeated getInstance() calls
+    val base = Calendar.getInstance(philippinesZone)
     return events.mapNotNull { event ->
         val daysFromNow = event.countdownNumber.toIntOrNull() ?: return@mapNotNull null
-        val eventCal = Calendar.getInstance(philippinesZone)
+        val eventCal = base.clone() as Calendar
         eventCal.add(Calendar.DAY_OF_MONTH, daysFromNow)
         CalendarEvent(
             event = event,
@@ -67,8 +73,8 @@ fun CalendarView(
     surfaceColor: Color = Color.White,
     configResolver: ((Event) -> com.j4.eventify.components.EventTypeConfig)? = null
 ) {
-    val philippinesZone = java.util.TimeZone.getTimeZone("Asia/Manila")
-    val today           = Calendar.getInstance(philippinesZone)
+    // Uses the top-level cached philippinesZone — no disk read here
+    val today = Calendar.getInstance(philippinesZone)
 
     val todayDay   = today.get(Calendar.DAY_OF_MONTH)
     val todayMonth = today.get(Calendar.MONTH)
@@ -174,7 +180,7 @@ fun CalendarView(
                 Spacer(Modifier.height(8.dp))
 
                 // Calendar grid
-                val cal = Calendar.getInstance(philippinesZone)
+                val cal = today.clone() as Calendar
                 cal.set(currentYear, currentMonth, 1)
                 val firstDayOfWeek = cal.get(Calendar.DAY_OF_WEEK) - 1
                 val daysInMonth    = cal.getActualMaximum(Calendar.DAY_OF_MONTH)

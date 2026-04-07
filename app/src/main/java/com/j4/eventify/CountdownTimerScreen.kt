@@ -40,22 +40,21 @@ data class TimeRemaining(
     val seconds: Int
 )
 
+// Cached once — TimeZone.getTimeZone() reads from disk and is slow if called repeatedly
+private val philippinesZone: java.util.TimeZone =
+    java.util.TimeZone.getTimeZone("Asia/Manila")
+
 fun calculateTimeRemaining(countdownNumber: String): TimeRemaining {
-    val philippinesZone = java.util.TimeZone.getTimeZone("Asia/Manila")
-    val calendar = java.util.Calendar.getInstance(philippinesZone)
-    val currentTime = calendar.timeInMillis
+    val now    = java.util.Calendar.getInstance(philippinesZone)
+    val target = now.clone() as java.util.Calendar
 
     val daysFromNow = countdownNumber.toIntOrNull() ?: 0
+    target.add(java.util.Calendar.DAY_OF_MONTH, daysFromNow)
+    target.set(java.util.Calendar.HOUR_OF_DAY, 23)
+    target.set(java.util.Calendar.MINUTE, 59)
+    target.set(java.util.Calendar.SECOND, 59)
 
-    val targetCalendar = java.util.Calendar.getInstance(philippinesZone)
-    targetCalendar.add(java.util.Calendar.DAY_OF_MONTH, daysFromNow)
-    targetCalendar.set(java.util.Calendar.HOUR_OF_DAY, 23)
-    targetCalendar.set(java.util.Calendar.MINUTE, 59)
-    targetCalendar.set(java.util.Calendar.SECOND, 59)
-
-    val targetTime = targetCalendar.timeInMillis
-    val diff = targetTime - currentTime
-
+    val diff = target.timeInMillis - now.timeInMillis
     if (diff <= 0) return TimeRemaining(0, 0, 0, 0)
 
     val totalSeconds = diff / 1000
@@ -108,7 +107,7 @@ fun CountdownTimerScreen(
     var visible by remember { mutableStateOf(false) }
     val alpha by animateFloatAsState(
         targetValue   = if (visible) 1f else 0f,
-        animationSpec = tween(800),
+        animationSpec = tween(350),   // was 800 — shorter feels snappier without losing elegance
         label         = "fade_in"
     )
     LaunchedEffect(Unit) { visible = true }
