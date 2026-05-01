@@ -121,6 +121,7 @@ fun CountdownTimerScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .navigationBarsPadding() // <--- ADD THIS LINE HERE
                 .padding(horizontal = 24.dp, vertical = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
@@ -131,7 +132,6 @@ fun CountdownTimerScreen(
                 onDelete       = { showDeleteDialog = true },
                 textColor      = textColor
             )
-
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(32.dp),
