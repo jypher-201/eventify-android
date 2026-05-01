@@ -31,6 +31,14 @@ import com.j4.eventify.components.EventCard
 import com.j4.eventify.components.EventType
 import com.j4.eventify.ui.theme.*
 import kotlinx.coroutines.launch
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.j4.eventify.data.EventViewModel
+import com.j4.eventify.data.EventViewModelFactory
+import com.j4.eventify.data.local.EventEntity
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.concurrent.TimeUnit
 
 // ─────────────────────────────────────────────
 // Enums
@@ -100,6 +108,7 @@ fun getTopBarContentColor(theme: AppTheme): Color = when (theme) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
+    viewModel: EventViewModel = viewModel(factory = EventViewModelFactory),
     onNavigateToAddEvent: (String?, AppTheme) -> Unit = { _, _ -> },
     onNavigateToEventDetails: (Int) -> Unit = {},
     currentTheme: AppTheme = AppTheme.DEFAULT,
@@ -125,11 +134,51 @@ fun HomeScreen(
     val topBarColor        = getTopBarColor(currentTheme)
     val topBarContentColor = getTopBarContentColor(currentTheme)
 
-    val filteredAndSortedEvents = remember(selectedFilter, searchQuery, timeFilter) {
+    // 1. COLLECT THE REAL DATABASE FLOW
+    val entityList by viewModel.allEvents.collectAsState()
+
+    // 2. CONVERT ENTITIES TO UI EVENTS ON THE FLY
+    val realEvents = remember(entityList) {
+        entityList.map { entity ->
+            val date = Date(entity.timestamp)
+            val formatter = SimpleDateFormat("MMM dd, yyyy 'at' h:mm a", Locale.getDefault())
+            val dateString = formatter.format(date)
+
+            val diffInMillis = entity.timestamp - System.currentTimeMillis()
+            val diffInDays = TimeUnit.MILLISECONDS.toDays(diffInMillis)
+
+            val (countNum, countLabel) = when {
+                diffInDays > 1 -> Pair(diffInDays.toString(), "DAYS LEFT")
+                diffInDays == 1L -> Pair("1", "DAY LEFT")
+                diffInDays == 0L && diffInMillis > 0 -> Pair("NOW", "HAPPENING")
+                diffInMillis <= 0 -> Pair("DONE", "PASSED")
+                else -> Pair("--", "")
+            }
+
+            val typeEnum = try {
+                EventType.valueOf(entity.eventType)
+            } catch (e: Exception) {
+                EventType.PERSONAL
+            }
+
+            com.j4.eventify.components.Event(
+                id = entity.id,
+                title = entity.title,
+                type = typeEnum,
+                dateTime = dateString,
+                countdownNumber = countNum,
+                countdownLabel = countLabel,
+                notes = entity.description ?: ""
+            )
+        }
+    }
+
+    // 3. FILTERING LOGIC USING THE REAL EVENTS
+    val filteredAndSortedEvents = remember(selectedFilter, searchQuery, timeFilter, realEvents) {
         val filtered = if (selectedFilter != null)
-            DummyData.events.filter { it.type == selectedFilter }
+            realEvents.filter { it.type == selectedFilter }
         else
-            DummyData.events
+            realEvents
 
         val searched = if (searchQuery.isNotBlank())
             filtered.filter {
@@ -152,7 +201,6 @@ fun HomeScreen(
     val isFiltered = selectedFilter != null ||
             searchQuery.isNotBlank() ||
             timeFilter != TimeFilter.ALL
-
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -223,10 +271,12 @@ fun HomeScreen(
                                     verticalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     items(filteredAndSortedEvents, key = { it.id }) { event ->
+                                        // Used a safe call for customConfig here in case your Event class supports it!
+                                        val customCfg = try { event.javaClass.getMethod("getCustomConfig").invoke(event) as? com.j4.eventify.components.EventTypeConfig } catch (e: Exception) { null }
                                         EventCard(
                                             event          = event,
                                             onClick        = { onNavigateToEventDetails(event.id) },
-                                            overrideConfig = registry.resolveForType(event.type, event.customConfig)
+                                            overrideConfig = registry.resolveForType(event.type, customCfg)
                                         )
                                     }
                                 }
@@ -241,15 +291,14 @@ fun HomeScreen(
                                     textColor       = textColor,
                                     surfaceColor    = surfaceColor,
                                     configResolver  = { event ->
-                                        registry.resolveForType(event.type, event.customConfig)
+                                        val customCfg = try { event.javaClass.getMethod("getCustomConfig").invoke(event) as? com.j4.eventify.components.EventTypeConfig } catch (e: Exception) { null }
+                                        registry.resolveForType(event.type, customCfg)
                                     }
                                 )
                             }
                         }
                     }
 
-                    // FAB overlaid directly — avoids Scaffold wrapping it in its own
-                    // FloatingActionButton container which adds an unwanted tonal circle
                     EventifyFAB(
                         onClick = {
                             val dateToPass = if (viewMode == ViewMode.CALENDAR) selectedCalendarDate else null
@@ -263,7 +312,6 @@ fun HomeScreen(
         }
     )
 
-    // Built-in type editor — name + icon + color
     editingBuiltIn?.let { state ->
         EditTypeDialog(
             initialLabel    = state.label,
@@ -434,7 +482,6 @@ fun ModernTopBar(
                 verticalAlignment     = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Hamburger — always topBarContentColor
                 IconButton(onClick = onMenuClick, modifier = Modifier.size(44.dp)) {
                     Icon(
                         Icons.Default.Menu,
@@ -444,7 +491,6 @@ fun ModernTopBar(
                     )
                 }
 
-                // Search pill
                 Box(
                     modifier         = Modifier
                         .weight(1f)
@@ -533,11 +579,10 @@ fun ModernTopBar(
                     }
                 }
 
-                // Reset — matches bar content colour
                 IconButton(
                     onClick = onResetClick,
                     modifier = Modifier.size(44.dp),
-                    enabled = isFiltered // ✅ disables click when false
+                    enabled = isFiltered
                 ) {
                     Icon(
                         Icons.Default.Refresh,
@@ -545,14 +590,12 @@ fun ModernTopBar(
                         tint = if (isFiltered)
                             topBarContentColor
                         else
-                            topBarContentColor.copy(alpha = 0.35f), // 🌫️ faded
+                            topBarContentColor.copy(alpha = 0.35f),
                         modifier = Modifier.size(22.dp)
                     )
                 }
-
             }
         }
-
         HorizontalDivider(color = topBarContentColor.copy(alpha = 0.12f), thickness = 1.dp)
     }
 }
@@ -605,7 +648,6 @@ fun ModernDrawer(
                 textColor = textColor
             )
 
-            // Built-in types — colored dot, tap to filter, long-press to edit color
             listOf(registry.academic, registry.personal, registry.occasion).forEach { state ->
                 val cfg = state.toConfig()
                 DrawerTypeItem(
@@ -618,7 +660,6 @@ fun ModernDrawer(
                 )
             }
 
-            // Custom types — scrollable if many
             if (registry.customTypes.isNotEmpty()) {
                 HorizontalDivider(color = textColor.copy(alpha = 0.06f))
                 registry.customTypes.forEach { cfg ->
@@ -682,7 +723,6 @@ fun ThemeSelector(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment     = Alignment.CenterVertically
         ) {
-            // Light — white circle with an amber sun
             ThemeCircle(
                 circleColor = Color(0xFFFFFFFF),
                 selected    = currentTheme == AppTheme.DEFAULT,
@@ -691,25 +731,21 @@ fun ThemeSelector(
                 iconTint    = Color(0xFFFFA000),
                 borderColor = Color(0xFFDDDDDD)
             )
-            // Reddish-pink
             ThemeCircle(
                 circleColor = Color(0xFFE91E63),
                 selected    = currentTheme == AppTheme.REDDISH_PINK,
                 onClick     = { onThemeSelected(AppTheme.REDDISH_PINK) }
             )
-            // Amber / yellow
             ThemeCircle(
                 circleColor = Color(0xFFFF9800),
                 selected    = currentTheme == AppTheme.YELLOWISH,
                 onClick     = { onThemeSelected(AppTheme.YELLOWISH) }
             )
-            // Blue
             ThemeCircle(
                 circleColor = Color(0xFF2196F3),
                 selected    = currentTheme == AppTheme.BLUEISH,
                 onClick     = { onThemeSelected(AppTheme.BLUEISH) }
             )
-            // Dark — near-black with moon icon
             ThemeCircle(
                 circleColor = Color(0xFF1A1A1A),
                 selected    = currentTheme == AppTheme.DARK,
@@ -763,19 +799,17 @@ fun ThemeCircle(
         ) {
             when {
                 iconVector != null -> {
-                    // Always show the icon (sun / moon); if also selected, icon doubles as indicator
                     Icon(
                         imageVector        = iconVector,
                         contentDescription = null,
                         tint               = if (selected && iconVector == Icons.Default.WbSunny)
-                            Color(0xFFFF6F00) // deeper amber when selected
+                            Color(0xFFFF6F00)
                         else
                             iconTint,
                         modifier           = Modifier.size(18.dp)
                     )
                 }
                 selected -> {
-                    // Solid-colour circle: show checkmark when selected
                     Icon(
                         imageVector        = Icons.Default.Check,
                         contentDescription = "Selected",
@@ -1063,7 +1097,6 @@ fun DrawerTypeItem(
             verticalAlignment     = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Colored gradient dot
             Box(
                 modifier = Modifier
                     .size(22.dp)
@@ -1156,7 +1189,3 @@ fun DrawerCustomTypeItem(
         }
     }
 }
-
-// ─────────────────────────────────────────────
-// Edit Built-in Type Color Dialog
-// ─────────────────────────────────────────────
