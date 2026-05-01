@@ -118,12 +118,21 @@ fun AddEventScreen(
     var showCustomTypeDialog by remember { mutableStateOf(false) }
     var showCustomTypePicker by remember { mutableStateOf(false) }
 
-    var startDate by remember { mutableStateOf(prefilledEvent?.dateTime ?: prefilledDate ?: "Feb 25, 2024") }
-    var endDate   by remember { mutableStateOf(prefilledEvent?.dateTime ?: prefilledDate ?: "Feb 25, 2024") }
-    var startTime by remember { mutableStateOf("9:00 AM") }
+    // 1. Read the saved time and check if it's our secret "All Day" time
+    val savedTime = prefilledEvent?.dateTime?.substringAfter(" at ", "9:00 AM") ?: "9:00 AM"
+    val wasAllDay = savedTime == "12:00 AM"
+
+    var startDate by remember { mutableStateOf(prefilledEvent?.dateTime?.substringBefore(" at ") ?: prefilledDate ?: "Feb 25, 2024") }
+    var endDate   by remember { mutableStateOf(prefilledEvent?.dateTime?.substringBefore(" at ") ?: prefilledDate ?: "Feb 25, 2024") }
+
+    // 2. Set the toggle based on our check
+    var isAllDay  by remember { mutableStateOf(wasAllDay) }
+
+    // 3. If it was all day, reset the hidden time box to 9 AM just in case they turn the switch off!
+    var startTime by remember { mutableStateOf(if (wasAllDay) "9:00 AM" else savedTime) }
     var endTime   by remember { mutableStateOf("10:00 AM") }
+
     var notes     by remember { mutableStateOf(prefilledEvent?.notes ?: "") }
-    var isAllDay  by remember { mutableStateOf(false) }
 
     var notifications    by remember { mutableStateOf(listOf<String>()) }
     var showNotifPicker  by remember { mutableStateOf(false) }
@@ -162,16 +171,20 @@ fun AddEventScreen(
                 onNavigateBack = onNavigateBack,
                 onSave = {
                     if (title.isNotBlank()) {
-                        // 1. Convert the String Date back to a Unix Timestamp
-                        val format = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
+                        // 1. Secretly force the time to Midnight if All Day is toggled on
+                        val finalTime = if (isAllDay) "12:00 AM" else startTime
+
+                        val fullDateString = "$startDate at $finalTime"
+                        val format = SimpleDateFormat("MMM dd, yyyy 'at' h:mm a", Locale.getDefault())
                         val timestamp = try {
-                            format.parse(startDate)?.time ?: System.currentTimeMillis()
+                            format.parse(fullDateString)?.time ?: System.currentTimeMillis()
                         } catch (e: Exception) {
                             System.currentTimeMillis()
                         }
 
                         // 2. Build the Room Entity
                         val newEvent = EventEntity(
+                            id = prefilledEvent?.id ?: 0,
                             title = title.trim(),
                             description = notes.trim().ifEmpty { null },
                             eventType = if (selectedType == EventType.CUSTOM) {
@@ -181,13 +194,13 @@ fun AddEventScreen(
                             },
                             timestamp = timestamp,
                             locationName = location.trim().ifEmpty { null },
-                            latitude = null, // We'll add real Maps logic here later
+                            latitude = null,
                             longitude = null,
-                            remindBeforeMinutes = null // We'll map your custom notifications here later
+                            remindBeforeMinutes = null
                         )
 
-                        // 3. Save it to the Database
-                        viewModel.addEvent(newEvent)
+                        // 3. Save or Update the Database
+                        viewModel.addEvent(newEvent) // Room's "REPLACE" strategy handles the update automatically!
 
                         // 4. Return to HomeScreen
                         onNavigateBack()
