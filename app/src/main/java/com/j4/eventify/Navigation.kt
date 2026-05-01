@@ -11,6 +11,10 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.j4.eventify.data.EventViewModel
+import com.j4.eventify.data.EventViewModelFactory
 
 object Routes {
     const val HOME          = "home"
@@ -23,11 +27,16 @@ object Routes {
 }
 
 @Composable
-fun EventifyNavigation() {
+fun EventifyNavigation(
+    // 1. We inject the ViewModel right at the root of the app
+    viewModel: EventViewModel = viewModel(factory = EventViewModelFactory)
+) {
     val navController = rememberNavController()
 
+    // 2. We collect the live database flow here so the navigation system knows about all real events
+    val entityList by viewModel.allEvents.collectAsState(initial = emptyList())
+
     // rememberSaveable survives back-stack pops AND config changes.
-    // Stored as Int (ordinal) because enums aren't directly saveable.
     var themeOrdinal by rememberSaveable { mutableStateOf(AppTheme.DEFAULT.ordinal) }
     val currentTheme = AppTheme.entries[themeOrdinal]
 
@@ -56,7 +65,6 @@ fun EventifyNavigation() {
         }
 
         // ── Add Event ─────────────────────────────────────────
-        // ── Add Event ─────────────────────────────────────────
         composable(route = Routes.ADD_EVENT) {
             val handle       = navController.previousBackStackEntry?.savedStateHandle
             val selectedDate = handle?.get<String>("selectedDate")
@@ -78,7 +86,10 @@ fun EventifyNavigation() {
             arguments = listOf(navArgument("eventId") { type = NavType.IntType })
         ) { backStackEntry ->
             val eventId = backStackEntry.arguments?.getInt("eventId") ?: 0
-            val event   = DummyData.events.find { it.id == eventId }
+
+            // Find the REAL event in the database, not DummyData
+            val entity = entityList.find { it.id == eventId }
+            val event = entity?.let { mapEntityToUiEvent(it) }
 
             if (event != null) {
                 AddEventScreen(
@@ -96,17 +107,59 @@ fun EventifyNavigation() {
             arguments = listOf(navArgument("eventId") { type = NavType.IntType })
         ) { backStackEntry ->
             val eventId = backStackEntry.arguments?.getInt("eventId") ?: 0
-            val event   = DummyData.events.find { it.id == eventId }
+
+            // Find the REAL event in the database, not DummyData
+            val entity = entityList.find { it.id == eventId }
+            val event = entity?.let { mapEntityToUiEvent(it) }
 
             if (event != null) {
                 CountdownTimerScreen(
                     event          = event,
                     onNavigateBack = { navController.popBackStack() },
                     onEdit         = { navController.navigate(Routes.editEvent(eventId)) },
-                    onDelete       = { },
+                    onDelete       = {
+                        // MAGIC: We pass the real entity to the delete function!
+                        entity?.let { viewModel.deleteEvent(it) }
+                    },
                     registry       = registry
                 )
             }
         }
     }
+}
+
+// ─────────────────────────────────────────────
+// Database to UI Mapper Helper
+// ─────────────────────────────────────────────
+fun mapEntityToUiEvent(entity: com.j4.eventify.data.local.EventEntity): com.j4.eventify.components.Event {
+    val date = java.util.Date(entity.timestamp)
+    val formatter = java.text.SimpleDateFormat("MMM dd, yyyy 'at' h:mm a", java.util.Locale.getDefault())
+    val dateString = formatter.format(date)
+
+    val diffInMillis = entity.timestamp - System.currentTimeMillis()
+    val diffInDays = java.util.concurrent.TimeUnit.MILLISECONDS.toDays(diffInMillis)
+
+    val (countNum, countLabel) = when {
+        diffInDays > 1 -> Pair(diffInDays.toString(), "DAYS LEFT")
+        diffInDays == 1L -> Pair("1", "DAY LEFT")
+        diffInDays == 0L && diffInMillis > 0 -> Pair("NOW", "HAPPENING")
+        diffInMillis <= 0 -> Pair("DONE", "PASSED")
+        else -> Pair("--", "")
+    }
+
+    val typeEnum = try {
+        com.j4.eventify.components.EventType.valueOf(entity.eventType)
+    } catch (e: Exception) {
+        com.j4.eventify.components.EventType.PERSONAL
+    }
+
+    return com.j4.eventify.components.Event(
+        id = entity.id,
+        title = entity.title,
+        type = typeEnum,
+        dateTime = dateString,
+        countdownNumber = countNum,
+        countdownLabel = countLabel,
+        notes = entity.description ?: ""
+    )
 }
