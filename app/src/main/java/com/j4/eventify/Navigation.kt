@@ -56,6 +56,7 @@ fun EventifyNavigation() {
         }
 
         // ── Add Event ─────────────────────────────────────────
+        // ── Add Event ─────────────────────────────────────────
         composable(route = Routes.ADD_EVENT) {
             val handle       = navController.previousBackStackEntry?.savedStateHandle
             val selectedDate = handle?.get<String>("selectedDate")
@@ -63,10 +64,6 @@ fun EventifyNavigation() {
             AddEventScreen(
                 registry       = registry,
                 onNavigateBack = {
-                    handle?.remove<String>("selectedDate")
-                    navController.popBackStack()
-                },
-                onSaveEvent = { _, _, _, _, _ ->
                     handle?.remove<String>("selectedDate")
                     navController.popBackStack()
                 },
@@ -88,11 +85,7 @@ fun EventifyNavigation() {
                     registry       = registry,
                     prefilledEvent = event,
                     currentTheme   = currentTheme,
-                    onNavigateBack = { navController.popBackStack() },
-                    onSaveEvent    = { _, _, _, _, _ ->
-                        // TODO: update in database
-                        navController.popBackStack()
-                    }
+                    onNavigateBack = { navController.popBackStack() }
                 )
             }
         }

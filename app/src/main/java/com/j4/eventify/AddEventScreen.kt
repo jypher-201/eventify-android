@@ -3,7 +3,6 @@ package com.j4.eventify
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
@@ -23,16 +22,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.j4.eventify.components.Event
 import com.j4.eventify.components.EventType
 import com.j4.eventify.components.EventTypeConfig
-import com.j4.eventify.EventTypeRegistry
-import com.j4.eventify.BuiltInTypeState
-import com.j4.eventify.BuiltInIcon
 import com.j4.eventify.components.gradientPalette
 import com.j4.eventify.components.textColorForGradient
 import com.j4.eventify.components.badgeColorForGradient
@@ -40,6 +35,10 @@ import com.j4.eventify.ui.theme.*
 import androidx.compose.foundation.layout.statusBarsPadding
 import java.text.SimpleDateFormat
 import java.util.*
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.j4.eventify.data.EventViewModel
+import com.j4.eventify.data.EventViewModelFactory
+import com.j4.eventify.data.local.EventEntity
 
 // ─────────────────────────────────────────────
 // Data
@@ -88,11 +87,13 @@ fun formatTime(hour: Int, minute: Int): String {
 @Composable
 fun AddEventScreen(
     onNavigateBack: () -> Unit = {},
-    onSaveEvent: (String, EventType, String, String, String) -> Unit = { _, _, _, _, _ -> },
     prefilledDate: String? = null,
     currentTheme: AppTheme = AppTheme.DEFAULT,
     registry: EventTypeRegistry = androidx.compose.runtime.remember { EventTypeRegistry() },
-    prefilledEvent: Event? = null   // non-null → edit mode
+    prefilledEvent: Event? = null,
+    // 1. We no longer need the dummy onSaveEvent lambda.
+    // 2. Just inject the ViewModel directly:
+    viewModel: EventViewModel = viewModel(factory = EventViewModelFactory)
 ) {
     val isEditMode = prefilledEvent != null
 
@@ -159,7 +160,39 @@ fun AddEventScreen(
         topBar = {
             AddEventTopBar(
                 onNavigateBack = onNavigateBack,
-                onSave         = { if (title.isNotBlank()) onSaveEvent(title, selectedType, startDate, startTime, notes) },
+                onSave = {
+                    if (title.isNotBlank()) {
+                        // 1. Convert the String Date back to a Unix Timestamp
+                        val format = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
+                        val timestamp = try {
+                            format.parse(startDate)?.time ?: System.currentTimeMillis()
+                        } catch (e: Exception) {
+                            System.currentTimeMillis()
+                        }
+
+                        // 2. Build the Room Entity
+                        val newEvent = EventEntity(
+                            title = title.trim(),
+                            description = notes.trim().ifEmpty { null },
+                            eventType = if (selectedType == EventType.CUSTOM) {
+                                selectedCustomCfg?.label ?: EventType.CUSTOM.name
+                            } else {
+                                selectedType.name
+                            },
+                            timestamp = timestamp,
+                            locationName = location.trim().ifEmpty { null },
+                            latitude = null, // We'll add real Maps logic here later
+                            longitude = null,
+                            remindBeforeMinutes = null // We'll map your custom notifications here later
+                        )
+
+                        // 3. Save it to the Database
+                        viewModel.addEvent(newEvent)
+
+                        // 4. Return to HomeScreen
+                        onNavigateBack()
+                    }
+                },
                 canSave        = title.isNotBlank(),
                 topBarBg       = topBarBg,
                 topBarFg       = topBarFg,
