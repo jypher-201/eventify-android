@@ -180,7 +180,7 @@ fun EventCard(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(90.dp)
+            .heightIn(min = 90.dp)
             .graphicsLayer { scaleX = scale; scaleY = scale }
     ) {
         Box(
@@ -267,13 +267,13 @@ fun EventCard(
                                 modifier = Modifier.size(15.dp)
                             )
                             Text(
-                                // ── THE FIX: Visually erase the tag! ──
-                                text      = event.dateTime.replace(" (All Day)", ""),
-                                fontSize  = 13.sp,
+                                text       = event.dateTime.replace(" (All Day)", ""),
+                                fontSize   = 12.sp, // <--- Shrink slightly from 13.sp to 12.sp
                                 fontWeight = FontWeight.Medium,
-                                color     = config.textColor.copy(alpha = 0.8f),
-                                maxLines  = 1,
-                                overflow  = TextOverflow.Ellipsis
+                                color      = config.textColor.copy(alpha = 0.8f),
+                                maxLines   = 2, // <--- CHANGE THIS to 2
+                                lineHeight = 16.sp, // <--- ADD THIS so it looks clean when stacked
+                                overflow   = TextOverflow.Ellipsis
                             )
                         }
                     }
