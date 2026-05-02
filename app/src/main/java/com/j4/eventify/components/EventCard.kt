@@ -128,7 +128,8 @@ data class Event(
     val customConfig: EventTypeConfig? = null,
     val rawStartMs: Long = 0L,
     val rawEndMs: Long? = null,
-    val isAllDay: Boolean = false
+    val isAllDay: Boolean = false,
+    val remindBeforeMinutes: Int? = null
 )
 
 // Resolve the config to use for rendering

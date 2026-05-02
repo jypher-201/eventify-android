@@ -79,6 +79,27 @@ fun formatTime(hour: Int, minute: Int): String {
     return String.format(Locale.US, "%d:%02d %s", displayHour, minute, amPm)
 }
 
+fun parseNotificationToMinutes(label: String): Int? {
+    val parts = label.lowercase().split(" ")
+    val amount = parts.firstOrNull()?.toIntOrNull() ?: return null
+    return when {
+        parts.any { it.startsWith("minute") } -> amount
+        parts.any { it.startsWith("hour") }   -> amount * 60
+        parts.any { it.startsWith("day") }    -> amount * 60 * 24
+        parts.any { it.startsWith("week") }   -> amount * 60 * 24 * 7
+        else -> null
+    }
+}
+
+fun formatMinutesToNotification(minutes: Int): String {
+    return when {
+        minutes % (60 * 24 * 7) == 0 -> "${minutes / (60 * 24 * 7)} ${if (minutes == 60 * 24 * 7) "week" else "weeks"} before"
+        minutes % (60 * 24) == 0     -> "${minutes / (60 * 24)} ${if (minutes == 60 * 24) "day" else "days"} before"
+        minutes % 60 == 0            -> "${minutes / 60} ${if (minutes == 60) "hour" else "hours"} before"
+        else                         -> "$minutes minutes before"
+    }
+}
+
 // ─────────────────────────────────────────────
 // AddEventScreen
 // ─────────────────────────────────────────────
@@ -160,7 +181,11 @@ fun AddEventScreen(
 
     var notes     by remember { mutableStateOf(prefilledEvent?.notes ?: "") }
 
-    var notifications    by remember { mutableStateOf(listOf<String>()) }
+    var notifications by remember {
+        mutableStateOf(
+            prefilledEvent?.remindBeforeMinutes?.let { listOf(formatMinutesToNotification(it)) } ?: emptyList()
+        )
+    }
     var showNotifPicker  by remember { mutableStateOf(false) }
     var showCustomDialog by remember { mutableStateOf(false) }
 
@@ -226,6 +251,9 @@ fun AddEventScreen(
                             }
                         }
 
+                        // 3. Translate the UI string to raw minutes
+                        val remindMinutes = notifications.firstOrNull()?.let { parseNotificationToMinutes(it) }
+
                         // 4. Build the upgraded Room Entity
                         val newEvent = EventEntity(
                             id = prefilledEvent?.id ?: 0,
@@ -237,7 +265,7 @@ fun AddEventScreen(
                             locationName = location.trim().ifEmpty { null },
                             latitude = null,
                             longitude = null,
-                            remindBeforeMinutes = null,
+                            remindBeforeMinutes = remindMinutes, // <--- THE FIX: Save the raw minutes!
                             gradientIndex = chosenGradient,
                             customLabel = selectedCustomCfg?.label
                         )
