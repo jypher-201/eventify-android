@@ -9,8 +9,9 @@ class EventRepository(private val eventDao: EventDao) {
     // Reads the continuous stream of events from Room
     val allEvents: Flow<List<EventEntity>> = eventDao.getAllEvents()
 
-    suspend fun insertEvent(event: EventEntity) {
-        eventDao.insertEvent(event)
+    // ── THE FIX: Return the Long ID! ──
+    suspend fun insertEvent(event: EventEntity): Long {
+        return eventDao.insertEvent(event)
     }
 
     suspend fun deleteEvent(event: EventEntity) {

@@ -3,11 +3,11 @@ package com.j4.eventify.data
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import androidx.lifecycle.viewmodel.CreationExtras
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.j4.eventify.EventifyApplication
 import com.j4.eventify.data.local.EventEntity
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -23,9 +23,14 @@ class EventViewModel(private val repository: EventRepository) : ViewModel() {
             initialValue = emptyList()
         )
 
-    fun addEvent(event: EventEntity) {
-        viewModelScope.launch {
-            repository.insertEvent(event)
+    fun addEvent(event: EventEntity, context: android.content.Context) {
+        viewModelScope.launch(Dispatchers.IO) {
+            // ── THIS IS THE CRITICAL LINE ──
+            val generatedId = repository.insertEvent(event).toInt()
+
+            // Trigger the Notification Scheduler!
+            val savedEvent = event.copy(id = generatedId)
+            com.j4.eventify.EventAlarmScheduler(context).schedule(savedEvent)
         }
     }
 

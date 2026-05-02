@@ -205,6 +205,17 @@ fun AddEventScreen(
     val startTimePickerState = rememberTimePickerState(initialHour = 9,  initialMinute = 0)
     val endTimePickerState   = rememberTimePickerState(initialHour = 10, initialMinute = 0)
 
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var showPermissionDialog by remember { mutableStateOf(false) }
+
+    // This handles the built-in Android permission popup
+    val permissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) showNotifPicker = true
+        else showPermissionDialog = true
+    }
+
     LaunchedEffect(isAllDay) { if (isAllDay) endDate = startDate }
 
     var visible by remember { mutableStateOf(false) }
@@ -270,7 +281,7 @@ fun AddEventScreen(
                             customLabel = selectedCustomCfg?.label
                         )
 
-                        viewModel.addEvent(newEvent)
+                        viewModel.addEvent(newEvent, context)
                         onNavigateBack()
                     }
                 },
@@ -340,7 +351,18 @@ fun AddEventScreen(
 
             NotificationsCard(
                 notifications = notifications,
-                onAddClick    = { showNotifPicker = true },
+                onAddClick    = {
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                        val status = androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.POST_NOTIFICATIONS)
+                        if (status == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                            showNotifPicker = true // They have permission, show it!
+                        } else {
+                            permissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS) // Ask for it!
+                        }
+                    } else {
+                        showNotifPicker = true // Android 12 and below grant it automatically
+                    }
+                },
                 onRemove      = { label -> notifications = notifications - label },
                 accent        = accent,
                 surfColor     = surfColor,
@@ -558,6 +580,28 @@ fun AddEventScreen(
             onConfirm = {
                 endTime = formatTime(endTimePickerState.hour, endTimePickerState.minute)
                 showEndTimePicker = false
+            }
+        )
+    }
+
+    if (showPermissionDialog) {
+        AlertDialog(
+            onDismissRequest = { showPermissionDialog = false },
+            title = { Text("Notifications Disabled", fontWeight = FontWeight.Bold) },
+            text = { Text("You need to enable notifications in your device settings to use event reminders.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showPermissionDialog = false
+                    val intent = android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                        data = android.net.Uri.fromParts("package", context.packageName, null)
+                    }
+                    context.startActivity(intent) // Redirects to OS Settings!
+                }) {
+                    Text("Go to Settings", color = accent)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPermissionDialog = false }) { Text("Cancel", color = Color.Gray) }
             }
         )
     }
