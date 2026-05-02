@@ -183,15 +183,111 @@ fun CountdownTimerScreen(
                     // UI STATE MACHINE (Finished vs Ongoing vs Upcoming)
                     // ─────────────────────────────────────────────
                     if (isFinished) {
-                        Text(
-                            text = "EVENT\nCOMPLETED",
-                            fontSize = 28.sp,
-                            fontWeight = FontWeight.Black,
-                            color = textColor.copy(alpha = 0.6f),
-                            textAlign = TextAlign.Center,
-                            lineHeight = 34.sp
-                        )
+                        // ── STATE 1: FINISHED (Memory Tracker / Time Since) ──
+                        val timeSinceMs = currentTime - effectiveEndMs
+                        val sinceDays = java.util.concurrent.TimeUnit.MILLISECONDS.toDays(timeSinceMs)
+                        val sinceHours = java.util.concurrent.TimeUnit.MILLISECONDS.toHours(timeSinceMs) % 24
+                        val sinceMinutes = java.util.concurrent.TimeUnit.MILLISECONDS.toMinutes(timeSinceMs) % 60
+
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            // Subtle "Completed" Badge
+                            Surface(
+                                shape = RoundedCornerShape(20.dp),
+                                color = textColor.copy(alpha = 0.1f),
+                                border = BorderStroke(1.dp, textColor.copy(alpha = 0.3f))
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Check,
+                                        contentDescription = null,
+                                        tint = textColor.copy(alpha = 0.6f),
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Text(
+                                        "COMPLETED",
+                                        color = textColor.copy(alpha = 0.6f),
+                                        fontWeight = FontWeight.Bold,
+                                        letterSpacing = 1.sp,
+                                        fontSize = 12.sp
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(24.dp))
+
+                            // The "Time Ago" Counter
+                            Text(
+                                text = "Ended",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = textColor.copy(alpha = 0.5f),
+                                letterSpacing = 2.sp
+                            )
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            Row(
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.Bottom
+                            ) {
+                                if (sinceDays > 0) {
+                                    AnimatedTimeUnit(
+                                        value = String.format(Locale.US, "%02d", sinceDays),
+                                        label = "DAYS",
+                                        color = textColor.copy(alpha = 0.7f),
+                                        numberSize = 48.sp,
+                                        labelSize = 10.sp
+                                    )
+                                    Text(
+                                        text = ":",
+                                        fontSize = 48.sp,
+                                        fontWeight = FontWeight.Black,
+                                        color = textColor.copy(alpha = 0.3f),
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                                    )
+                                }
+
+                                AnimatedTimeUnit(
+                                    value = String.format(Locale.US, "%02d", sinceHours),
+                                    label = "HOURS",
+                                    color = textColor.copy(alpha = 0.7f),
+                                    numberSize = 48.sp,
+                                    labelSize = 10.sp
+                                )
+
+                                Text(
+                                    text = ":",
+                                    fontSize = 48.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = textColor.copy(alpha = 0.3f),
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                                )
+
+                                AnimatedTimeUnit(
+                                    value = String.format(Locale.US, "%02d", sinceMinutes),
+                                    label = "MINS",
+                                    color = textColor.copy(alpha = 0.7f),
+                                    numberSize = 48.sp,
+                                    labelSize = 10.sp
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                text = "ago",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = textColor.copy(alpha = 0.5f),
+                                letterSpacing = 2.sp
+                            )
+                        }
+
                     } else if (isOngoing) {
+                        // ... (Keep your existing Ongoing code here)
                         // Pulsing Animation Engine
                         val infinitePulse = rememberInfiniteTransition(label = "pulse")
                         val pulseAlpha by infinitePulse.animateFloat(
