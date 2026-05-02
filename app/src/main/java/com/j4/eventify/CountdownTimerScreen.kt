@@ -79,7 +79,13 @@ fun CountdownTimerScreen(
         EventType.ACADEMIC -> registry.academic.toConfig()
         EventType.PERSONAL -> registry.personal.toConfig()
         EventType.OCCASION -> registry.occasion.toConfig()
-        EventType.CUSTOM -> event.customConfig ?: registry.academic.toConfig()
+        EventType.CUSTOM -> {
+            // ── THE FIX: Look up the live category and ignore case! ──
+            val liveCategory = registry.customTypes.find {
+                it.label.equals(event.customConfig?.label, ignoreCase = true)
+            }
+            liveCategory ?: event.customConfig ?: registry.academic.toConfig()
+        }
     }
 
     val backgroundColor = Brush.linearGradient(
@@ -89,7 +95,7 @@ fun CountdownTimerScreen(
 
     var showDeleteDialog by remember { mutableStateOf(false) }
     var timeRemaining by remember { mutableStateOf(calculateTimeRemaining(event.countdownNumber)) }
-    
+
 
     LaunchedEffect(event.id) {
         while (true) {

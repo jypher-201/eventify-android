@@ -251,8 +251,10 @@ fun HomeScreen(
                                             EventType.PERSONAL -> registry.personal.toConfig()
                                             EventType.OCCASION -> registry.occasion.toConfig()
                                             EventType.CUSTOM -> {
-                                                // ── THE FIX: Look up the live edited color from the Sidebar! ──
-                                                val liveCategory = registry.customTypes.find { it.label == event.customConfig?.label }
+                                                // ── THE FIX: Ignore uppercase/lowercase when matching! ──
+                                                val liveCategory = registry.customTypes.find {
+                                                    it.label.equals(event.customConfig?.label, ignoreCase = true)
+                                                }
                                                 liveCategory ?: event.customConfig ?: registry.academic.toConfig()
                                             }
                                         }
@@ -282,7 +284,9 @@ fun HomeScreen(
                                             EventType.OCCASION -> registry.occasion.toConfig()
                                             EventType.CUSTOM -> {
                                                 // ── THE FIX AGAIN! ──
-                                                val liveCategory = registry.customTypes.find { it.label == event.customConfig?.label }
+                                                val liveCategory = registry.customTypes.find {
+                                                    it.label.equals(event.customConfig?.label, ignoreCase = true)
+                                                }
                                                 liveCategory ?: event.customConfig ?: registry.academic.toConfig()
                                             }
                                         }
