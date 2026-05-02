@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -35,14 +36,16 @@ data class EditTypeResult(
 fun EditBuiltInTypeDialog(
     state: BuiltInTypeState,
     onDismiss: () -> Unit,
-    onConfirm: (Int) -> Unit  // kept for built-in compat — calls full version internally
+    // ── THE FIX: Pass the full result, not just the Int! ──
+    onConfirm: (EditTypeResult) -> Unit
 ) {
     EditTypeDialog(
         initialLabel       = state.label,
         initialGradient    = state.gradientIndex,
         initialIconKey     = state.iconKey,
         onDismiss          = onDismiss,
-        onConfirm          = { result -> onConfirm(result.gradientIndex) }
+        onConfirm          = onConfirm,
+        showDelete         = false // We hide the delete button for default built-in types
     )
 }
 
@@ -54,6 +57,8 @@ fun EditTypeDialog(
     initialIconKey: BuiltInIcon,
     onDismiss: () -> Unit,
     onConfirm: (EditTypeResult) -> Unit,
+    showDelete: Boolean = false,
+    onDelete: () -> Unit = {},
     surfColor: Color = White,
     textColor: Color = Color(0xFF1A1A1A)
 ) {
@@ -72,12 +77,34 @@ fun EditTypeDialog(
         containerColor   = surfColor,
         shape            = RoundedCornerShape(20.dp),
         title = {
-            Text(
-                if (initialLabel.isBlank()) "New event type" else "Edit event type",
-                fontSize   = 18.sp,
-                fontWeight = FontWeight.Bold,
-                color      = textColor
-            )
+            // ── THE FIX: Use a Row to push the title left and the Trash icon right ──
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    if (initialLabel.isBlank()) "New event type" else "Edit event type",
+                    fontSize   = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color      = textColor
+                )
+
+                // ── THE NEW TOP-RIGHT TRASH ICON ──
+                if (showDelete) {
+                    IconButton(
+                        onClick = onDelete,
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = "Delete",
+                            tint = Color(0xFFFF5252),
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                }
+            }
         },
         text = {
             androidx.compose.foundation.rememberScrollState().let { scroll ->
@@ -220,6 +247,7 @@ fun EditTypeDialog(
             }
         },
         dismissButton = {
+            // ── Cleaned up bottom buttons ──
             TextButton(onClick = onDismiss) {
                 Text("Cancel", color = textColor.copy(alpha = 0.6f))
             }

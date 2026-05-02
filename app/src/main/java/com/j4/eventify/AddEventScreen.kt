@@ -457,7 +457,8 @@ fun AddEventScreen(
                     gradientStart = pair.first,
                     gradientEnd   = pair.second,
                     textColor     = textColorForGradient(pair.first),
-                    badgeColor    = badgeColorForGradient(pair.first, pair.second)
+                    badgeColor    = badgeColorForGradient(pair.first, pair.second),
+                    iconKey       = result.iconKey // <--- ADD THIS LINE!
                 )
                 registry.addCustomType(cfg)
                 customTypes          = customTypes + cfg
@@ -796,7 +797,7 @@ fun AddEventTypeSelector(
         items(customTypes) { cfg ->
             AddEventTypeChip(
                 text          = cfg.label,
-                icon          = Icons.Default.Star,
+                icon          = cfg.iconKey?.imageVector ?: Icons.Default.Star,
                 selected      = selectedType == EventType.CUSTOM && selectedCustomCfg == cfg,
                 onClick       = { onCustomSelected(cfg) },
                 color         = cfg.gradientStart,

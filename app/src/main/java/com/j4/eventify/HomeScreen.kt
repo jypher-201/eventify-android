@@ -335,7 +335,12 @@ fun HomeScreen(
         EditTypeDialog(
             initialLabel    = cfg.label,
             initialGradient = currentIndex,
-            initialIconKey  = BuiltInIcon.STAR,
+            initialIconKey  = cfg.iconKey ?: BuiltInIcon.STAR, // ── THE FIX: Load the saved icon!
+            showDelete      = true,                            // ── THE FIX: Turn on the Delete button!
+            onDelete        = {                                // ── THE FIX: Make it delete the category!
+                registry.removeCustomType(cfg)
+                editingCustom = null
+            },
             surfColor       = surfaceColor,
             textColor       = textColor,
             onDismiss       = { editingCustom = null },
@@ -346,7 +351,8 @@ fun HomeScreen(
                     gradientStart = pair.first,
                     gradientEnd   = pair.second,
                     textColor     = com.j4.eventify.components.textColorForGradient(pair.first),
-                    badgeColor    = com.j4.eventify.components.badgeColorForGradient(pair.first, pair.second)
+                    badgeColor    = com.j4.eventify.components.badgeColorForGradient(pair.first, pair.second),
+                    iconKey       = result.iconKey             // ── THE FIX: Save the new icon!
                 )
                 registry.updateCustomType(cfg, updated)
                 editingCustom = null
@@ -1128,8 +1134,9 @@ fun DrawerTypeItem(
                     )
             )
 
+            // ── THE FIX: Read the icon from the state! ──
             Icon(
-                state.icon,
+                state.iconKey.imageVector,
                 null,
                 tint     = if (selected) config.gradientStart else Color.Gray,
                 modifier = Modifier.size(20.dp)
@@ -1185,12 +1192,15 @@ fun DrawerCustomTypeItem(
                         )
                     )
             )
+
+            // ── THE FIX: Read the iconKey from the config, fallback to Star! ──
             Icon(
-                Icons.Default.Star,
+                config.iconKey?.imageVector ?: Icons.Default.Star,
                 null,
                 tint     = if (selected) config.gradientStart else Color.Gray,
                 modifier = Modifier.size(20.dp)
             )
+
             Text(
                 config.label,
                 fontSize   = 15.sp,

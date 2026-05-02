@@ -25,6 +25,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.j4.eventify.BuiltInIcon
 
 // ─────────────────────────────────────────────
 // Event Type
@@ -53,7 +54,8 @@ data class EventTypeConfig(
     val gradientStart: Color,
     val gradientEnd: Color,
     val textColor: Color,
-    val badgeColor: Color
+    val badgeColor: Color,
+    val iconKey: BuiltInIcon? = null
 )
 
 // Default configs for the three built-in types

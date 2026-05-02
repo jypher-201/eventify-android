@@ -79,8 +79,6 @@ data class BuiltInTypeState(
 
     fun toConfig(): EventTypeConfig {
         val pair = gradientPalette[gradientIndex.coerceIn(0, gradientPalette.lastIndex)]
-        // Preserve original hand-tuned text/badge colors for the 3 default gradient indices.
-        // Only auto-derive colors when user picks a custom gradient.
         val (textColor, badgeColor) = when {
             type == EventType.ACADEMIC && gradientIndex == 0 ->
                 Pair(androidx.compose.ui.graphics.Color.White, androidx.compose.ui.graphics.Color(0xFF5E35B1))
@@ -97,7 +95,8 @@ data class BuiltInTypeState(
             gradientStart = pair.first,
             gradientEnd   = pair.second,
             textColor     = textColor,
-            badgeColor    = badgeColor
+            badgeColor    = badgeColor,
+            iconKey       = iconKey // Pass it through here!
         )
     }
 }
@@ -107,14 +106,13 @@ data class BuiltInTypeState(
 // ─────────────────────────────────────────────
 
 class EventTypeRegistry(context: Context) {
-    // Connect to local persistent storage
     private val prefs = context.getSharedPreferences("EventifyRegistryPrefs", Context.MODE_PRIVATE)
 
     var academic by mutableStateOf(
         BuiltInTypeState(
             EventType.ACADEMIC,
             prefs.getString("ACADEMIC_label", "Academic") ?: "Academic",
-            BuiltInIcon.valueOf(prefs.getString("ACADEMIC_icon", "SCHOOL") ?: "SCHOOL"),
+            try { BuiltInIcon.valueOf(prefs.getString("ACADEMIC_icon", "SCHOOL") ?: "SCHOOL") } catch(e: Exception) { BuiltInIcon.SCHOOL },
             prefs.getInt("ACADEMIC_gradient", 0)
         )
     )
@@ -122,7 +120,7 @@ class EventTypeRegistry(context: Context) {
         BuiltInTypeState(
             EventType.PERSONAL,
             prefs.getString("PERSONAL_label", "Personal") ?: "Personal",
-            BuiltInIcon.valueOf(prefs.getString("PERSONAL_icon", "FITNESS") ?: "FITNESS"),
+            try { BuiltInIcon.valueOf(prefs.getString("PERSONAL_icon", "FITNESS") ?: "FITNESS") } catch(e: Exception) { BuiltInIcon.FITNESS },
             prefs.getInt("PERSONAL_gradient", 1)
         )
     )
@@ -130,12 +128,11 @@ class EventTypeRegistry(context: Context) {
         BuiltInTypeState(
             EventType.OCCASION,
             prefs.getString("OCCASION_label", "Occasion") ?: "Occasion",
-            BuiltInIcon.valueOf(prefs.getString("OCCASION_icon", "CAKE") ?: "CAKE"),
+            try { BuiltInIcon.valueOf(prefs.getString("OCCASION_icon", "CAKE") ?: "CAKE") } catch(e: Exception) { BuiltInIcon.CAKE },
             prefs.getInt("OCCASION_gradient", 2)
         )
     )
 
-    // ── NEW: Load custom types from SharedPreferences on startup ──
     var customTypes by mutableStateOf(loadCustomTypes())
         private set
 
@@ -153,7 +150,6 @@ class EventTypeRegistry(context: Context) {
             .apply()
     }
 
-    // ── NEW: Functions to automatically save and load the custom list ──
     fun addCustomType(config: EventTypeConfig) {
         if (!customTypes.any { it.label == config.label }) {
             customTypes = customTypes + config
@@ -173,9 +169,10 @@ class EventTypeRegistry(context: Context) {
 
     private fun saveCustomTypes() {
         val stringSet = customTypes.map { cfg ->
-            // FIX: Change coerceAtLeast(3) to coerceAtLeast(0)
             val index = gradientPalette.indexOfFirst { it.first == cfg.gradientStart }.coerceAtLeast(0)
-            "${cfg.label}|$index"
+            // ── THE FIX: Save the icon name alongside the label and color! ──
+            val iconName = cfg.iconKey?.name ?: "STAR"
+            "${cfg.label}|$index|$iconName"
         }.toSet()
         prefs.edit().putStringSet("CUSTOM_TYPES_LIST", stringSet).apply()
     }
@@ -184,11 +181,14 @@ class EventTypeRegistry(context: Context) {
         val savedSet = prefs.getStringSet("CUSTOM_TYPES_LIST", emptySet()) ?: emptySet()
         return savedSet.mapNotNull { savedString ->
             val parts = savedString.split("|")
-            if (parts.size == 2) {
+            // ── THE FIX: Load all 3 parts ──
+            if (parts.size >= 2) {
                 val label = parts[0]
-                // FIX: Change default from 3 to 0
                 val index = parts[1].toIntOrNull() ?: 0
+                val iconName = parts.getOrNull(2) ?: "STAR" // Default to star if they made it before this update
+
                 val pair = gradientPalette[index.coerceIn(0, gradientPalette.lastIndex)]
+                val icon = try { BuiltInIcon.valueOf(iconName) } catch (e: Exception) { BuiltInIcon.STAR }
 
                 EventTypeConfig(
                     type = EventType.CUSTOM,
@@ -196,10 +196,11 @@ class EventTypeRegistry(context: Context) {
                     gradientStart = pair.first,
                     gradientEnd = pair.second,
                     textColor = textColorForGradient(pair.first),
-                    badgeColor = badgeColorForGradient(pair.first, pair.second)
+                    badgeColor = badgeColorForGradient(pair.first, pair.second),
+                    iconKey = icon // Put it back into the config!
                 )
             } else null
-        }.sortedBy { it.label } // Keeps them alphabetical in your menus!
+        }.sortedBy { it.label }
     }
 
     fun academicConfig() = academic.toConfig()
