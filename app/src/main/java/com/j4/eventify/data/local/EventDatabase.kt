@@ -7,7 +7,7 @@ import androidx.room.RoomDatabase
 
 @Database(
     entities = [EventEntity::class],
-    version = 3, // <--- CRITICAL: Change this from 1 to 2!
+    version = 4, // <--- CRITICAL: Change this from 1 to 2!
     exportSchema = false
 )
 abstract class EventDatabase : RoomDatabase() {

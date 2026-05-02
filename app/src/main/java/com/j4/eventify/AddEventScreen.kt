@@ -185,7 +185,7 @@ fun AddEventScreen(
 
     var location by remember { mutableStateOf("") }
 
-    var repeatOption     by remember { mutableStateOf("Does not repeat") }
+    var repeatOption by remember { mutableStateOf(prefilledEvent?.repeatMode ?: "Does not repeat") }
     var showRepeatPicker by remember { mutableStateOf(false) }
     var showCustomRepeat by remember { mutableStateOf(false) }
 
@@ -261,7 +261,9 @@ fun AddEventScreen(
                             longitude = null,
                             remindBeforeMinutes = remindMinutes,
                             gradientIndex = chosenGradient,
-                            customLabel = selectedCustomCfg?.label
+                            customLabel = selectedCustomCfg?.label,
+                            repeatMode = if (repeatOption == "Does not repeat") null else repeatOption,
+                            isAllDay = isAllDay
                         )
 
                         viewModel.addEvent(newEvent, context)

@@ -213,7 +213,8 @@ fun mapEntityToUiEvent(entity: com.j4.eventify.data.local.EventEntity): com.j4.e
         customConfig = customCfg,
         rawStartMs = entity.timestamp,
         rawEndMs = entity.endTimestamp,
-        isAllDay = isAllDay,
-        remindBeforeMinutes = entity.remindBeforeMinutes
+        isAllDay = entity.isAllDay,
+        remindBeforeMinutes = entity.remindBeforeMinutes,
+        repeatMode = entity.repeatMode
     )
 }

@@ -33,6 +33,39 @@ import com.j4.eventify.ui.theme.*
 import androidx.compose.foundation.layout.statusBarsPadding
 import java.util.Locale
 
+// ─────────────────────────────────────────────
+// TIME MACHINE (For Recurring Events)
+// ─────────────────────────────────────────────
+fun calculateNextOccurrence(startMs: Long, endMs: Long, repeatMode: String?, currentTime: Long): Pair<Long, Long> {
+    if (repeatMode.isNullOrBlank() || repeatMode == "Does not repeat") return startMs to endMs
+
+    var currentStart = startMs
+    var currentEnd = endMs
+    val duration = endMs - startMs
+    val cal = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("Asia/Manila"))
+
+    val lower = repeatMode.lowercase()
+    val parts = lower.split(" ")
+    val amount = parts.getOrNull(1)?.toIntOrNull() ?: 1
+    val unit = when {
+        lower.contains("day") -> java.util.Calendar.DAY_OF_YEAR
+        lower.contains("week") -> java.util.Calendar.WEEK_OF_YEAR
+        lower.contains("month") -> java.util.Calendar.MONTH
+        lower.contains("year") -> java.util.Calendar.YEAR
+        else -> java.util.Calendar.DAY_OF_YEAR
+    }
+
+    // Keep shifting into the future until the End Time passes 'Right Now'
+    while (currentEnd < currentTime) {
+        cal.timeInMillis = currentStart
+        cal.add(unit, amount)
+        currentStart = cal.timeInMillis
+        currentEnd = currentStart + duration
+    }
+
+    return currentStart to currentEnd
+}
+
 @Composable
 fun CountdownTimerScreen(
     event: Event,
@@ -61,7 +94,7 @@ fun CountdownTimerScreen(
     var showDeleteDialog by remember { mutableStateOf(false) }
 
     // ─────────────────────────────────────────────
-    // NEW SMART TIMER ENGINE
+    // SMART TIMER ENGINE
     // ─────────────────────────────────────────────
     var currentTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
 
@@ -72,15 +105,18 @@ fun CountdownTimerScreen(
         }
     }
 
-    // Safely figure out the End Time (Default to 1 hour, or 24 hours if All Day)
-    val effectiveEndMs = event.rawEndMs ?: if (event.isAllDay) event.rawStartMs + 86400000L else event.rawStartMs + 3600000L
+    // Safely figure out the Original End Time
+    val originalEndMs = event.rawEndMs ?: if (event.isAllDay) event.rawStartMs + 86400000L else event.rawStartMs + 3600000L
+
+    // ── TIME TRAVEL ──
+    val (activeStartMs, activeEndMs) = calculateNextOccurrence(event.rawStartMs, originalEndMs, event.repeatMode, currentTime)
 
     // Determine the exact State of the event
-    val isFinished = currentTime > effectiveEndMs
-    val isOngoing = currentTime >= event.rawStartMs && currentTime <= effectiveEndMs
+    val isFinished = currentTime > activeEndMs
+    val isOngoing = currentTime >= activeStartMs && currentTime <= activeEndMs
 
     // Target the Start Time if upcoming, Target the End Time if ongoing!
-    val targetTime = if (isOngoing) effectiveEndMs else event.rawStartMs
+    val targetTime = if (isOngoing) activeEndMs else activeStartMs
 
     // Never allow negative numbers!
     val diffInMillis = (targetTime - currentTime).coerceAtLeast(0L)
@@ -183,14 +219,13 @@ fun CountdownTimerScreen(
                     // UI STATE MACHINE (Finished vs Ongoing vs Upcoming)
                     // ─────────────────────────────────────────────
                     if (isFinished) {
-                        // ── STATE 1: FINISHED (Memory Tracker / Time Since) ──
-                        val timeSinceMs = currentTime - effectiveEndMs
+                        // ── STATE 1: FINISHED (Memory Tracker) ──
+                        val timeSinceMs = currentTime - activeEndMs
                         val sinceDays = java.util.concurrent.TimeUnit.MILLISECONDS.toDays(timeSinceMs)
                         val sinceHours = java.util.concurrent.TimeUnit.MILLISECONDS.toHours(timeSinceMs) % 24
                         val sinceMinutes = java.util.concurrent.TimeUnit.MILLISECONDS.toMinutes(timeSinceMs) % 60
 
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            // Subtle "Completed" Badge
                             Surface(
                                 shape = RoundedCornerShape(20.dp),
                                 color = textColor.copy(alpha = 0.1f),
@@ -219,7 +254,6 @@ fun CountdownTimerScreen(
 
                             Spacer(modifier = Modifier.height(24.dp))
 
-                            // The "Time Ago" Counter
                             Text(
                                 text = "Ended",
                                 fontSize = 14.sp,
@@ -287,8 +321,7 @@ fun CountdownTimerScreen(
                         }
 
                     } else if (isOngoing) {
-                        // ... (Keep your existing Ongoing code here)
-                        // Pulsing Animation Engine
+                        // ── STATE 2: HAPPENING NOW ──
                         val infinitePulse = rememberInfiniteTransition(label = "pulse")
                         val pulseAlpha by infinitePulse.animateFloat(
                             initialValue = 0.3f,
@@ -330,7 +363,7 @@ fun CountdownTimerScreen(
                             )
                         }
                     } else {
-                        // Standard Upcoming Timer
+                        // ── STATE 3: UPCOMING ──
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(20.dp)

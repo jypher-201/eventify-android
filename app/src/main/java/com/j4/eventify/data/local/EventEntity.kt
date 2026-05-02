@@ -15,8 +15,8 @@ data class EventEntity(
 
     // New: Location Data
     val locationName: String?,
-    val latitude: Double?,
-    val longitude: Double?,
+    val latitude: Double? = null, // Future-proofed for map pins!
+    val longitude: Double? = null, // Future-proofed for map pins!
 
     // New: Notification Preference
     val remindBeforeMinutes: Int?, // e.g., 15 mins, 60 mins, or 1440 (1 day)
@@ -25,5 +25,7 @@ data class EventEntity(
     val isPhilippineHoliday: Boolean = false, // Helps filter auto-added holidays
 
     val gradientIndex: Int = 0,       // Remembers the specific color!
-    val customLabel: String? = null
+    val customLabel: String? = null,
+    val repeatMode: String? = null,
+    val isAllDay: Boolean = false // <--- THE FINAL MISSING PIECE!
 )
