@@ -110,10 +110,8 @@ fun AddEventScreen(
     onNavigateBack: () -> Unit = {},
     prefilledDate: String? = null,
     currentTheme: AppTheme = AppTheme.DEFAULT,
-    registry: EventTypeRegistry, // <--- DELETE the "=" and everything after it!
+    registry: EventTypeRegistry,
     prefilledEvent: Event? = null,
-    // 1. We no longer need the dummy onSaveEvent lambda.
-    // 2. Just inject the ViewModel directly:
     viewModel: EventViewModel = viewModel(factory = EventViewModelFactory)
 ) {
     val isEditMode = prefilledEvent != null
@@ -138,10 +136,6 @@ fun AddEventScreen(
     var selectedCustomCfg    by remember { mutableStateOf(prefilledEvent?.customConfig) }
     var showCustomTypeDialog by remember { mutableStateOf(false) }
     var showCustomTypePicker by remember { mutableStateOf(false) }
-
-    // 1. Read the saved time and check if it's our secret "All Day" time
-    val savedTime = prefilledEvent?.dateTime?.substringAfter(" at ", "9:00 AM") ?: "9:00 AM"
-    val wasAllDay = savedTime == "12:00 AM"
 
     val isPrefilledAllDay = prefilledEvent?.isAllDay == true
 
@@ -200,15 +194,9 @@ fun AddEventScreen(
     var showStartTimePicker by remember { mutableStateOf(false) }
     var showEndTimePicker   by remember { mutableStateOf(false) }
 
-    val startDatePickerState = rememberDatePickerState()
-    val endDatePickerState   = rememberDatePickerState()
-    val startTimePickerState = rememberTimePickerState(initialHour = 9,  initialMinute = 0)
-    val endTimePickerState   = rememberTimePickerState(initialHour = 10, initialMinute = 0)
-
     val context = androidx.compose.ui.platform.LocalContext.current
     var showPermissionDialog by remember { mutableStateOf(false) }
 
-    // This handles the built-in Android permission popup
     val permissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
     ) { isGranted ->
@@ -233,7 +221,6 @@ fun AddEventScreen(
                 onNavigateBack = onNavigateBack,
                 onSave = {
                     if (title.isNotBlank()) {
-                        // 1. Calculate Start Timestamp
                         val finalStartTime = if (isAllDay) "12:00 AM" else startTime
                         val startFullDateString = "$startDate at $finalStartTime"
                         val format = java.text.SimpleDateFormat("MMM dd, yyyy 'at' h:mm a", java.util.Locale.getDefault())
@@ -241,14 +228,12 @@ fun AddEventScreen(
                             format.parse(startFullDateString)?.time ?: System.currentTimeMillis()
                         } catch (e: Exception) { System.currentTimeMillis() }
 
-                        // 2. Calculate End Timestamp
                         val finalEndTime = if (isAllDay) "12:00 AM" else endTime
                         val endFullDateString = "$endDate at $finalEndTime"
                         val endTimestamp = try {
                             format.parse(endFullDateString)?.time
                         } catch (e: Exception) { null }
 
-                        // 3. Figure out which color index they are using
                         val chosenGradient = if (selectedType == EventType.CUSTOM) {
                             com.j4.eventify.components.gradientPalette.indexOfFirst {
                                 it.first == selectedCustomCfg?.gradientStart
@@ -262,10 +247,8 @@ fun AddEventScreen(
                             }
                         }
 
-                        // 3. Translate the UI string to raw minutes
                         val remindMinutes = notifications.firstOrNull()?.let { parseNotificationToMinutes(it) }
 
-                        // 4. Build the upgraded Room Entity
                         val newEvent = EventEntity(
                             id = prefilledEvent?.id ?: 0,
                             title = title.trim(),
@@ -276,7 +259,7 @@ fun AddEventScreen(
                             locationName = location.trim().ifEmpty { null },
                             latitude = null,
                             longitude = null,
-                            remindBeforeMinutes = remindMinutes, // <--- THE FIX: Save the raw minutes!
+                            remindBeforeMinutes = remindMinutes,
                             gradientIndex = chosenGradient,
                             customLabel = selectedCustomCfg?.label
                         )
@@ -355,12 +338,12 @@ fun AddEventScreen(
                     if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
                         val status = androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.POST_NOTIFICATIONS)
                         if (status == android.content.pm.PackageManager.PERMISSION_GRANTED) {
-                            showNotifPicker = true // They have permission, show it!
+                            showNotifPicker = true
                         } else {
-                            permissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS) // Ask for it!
+                            permissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
                         }
                     } else {
-                        showNotifPicker = true // Android 12 and below grant it automatically
+                        showNotifPicker = true
                     }
                 },
                 onRemove      = { label -> notifications = notifications - label },
@@ -398,6 +381,10 @@ fun AddEventScreen(
             Spacer(Modifier.height(16.dp))
         }
     }
+
+    // ─────────────────────────────────────────────
+    // Dialogs & Pickers
+    // ─────────────────────────────────────────────
 
     if (showNotifPicker) {
         NotificationPickerDialog(
@@ -511,79 +498,6 @@ fun AddEventScreen(
         )
     }
 
-    // 1. Start Date Picker
-    if (showStartDatePicker) {
-        ThemedDatePickerDialog(
-            state = startDatePickerState,
-            accent = accent,
-            surfColor = surfColor,
-            textColor = textColor,
-            onDismiss = { showStartDatePicker = false },
-            onConfirm = {
-                startDatePickerState.selectedDateMillis?.let {
-                    val d = SimpleDateFormat("MMM dd, yyyy", Locale.US).format(Date(it))
-                    startDate = d
-                    endDate = d // <--- THE FIX: End Date instantly follows Start Date!
-                }
-                showStartDatePicker = false
-            }
-        )
-    }
-
-    // 2. End Date Picker
-    if (showEndDatePicker) {
-        ThemedDatePickerDialog(
-            state = endDatePickerState,
-            accent = accent,
-            surfColor = surfColor,
-            textColor = textColor,
-            onDismiss = { showEndDatePicker = false },
-            onConfirm = {
-                endDatePickerState.selectedDateMillis?.let {
-                    endDate = SimpleDateFormat("MMM dd, yyyy", Locale.US).format(Date(it))
-                }
-                showEndDatePicker = false
-            }
-        )
-    }
-
-    // 3. Start Time Picker
-    if (showStartTimePicker) {
-        ThemedTimePickerDialog(
-            state = startTimePickerState,
-            accent = accent,
-            surfColor = surfColor,
-            textColor = textColor,
-            isDark = isDark,
-            onDismiss = { showStartTimePicker = false },
-            onConfirm = {
-                val h = startTimePickerState.hour
-                val m = startTimePickerState.minute
-
-                startTime = formatTime(h, m)
-                endTime = formatTime((h + 1) % 24, m) // <--- THE FIX: End Time instantly jumps +1 hour!
-
-                showStartTimePicker = false
-            }
-        )
-    }
-
-    // 4. End Time Picker
-    if (showEndTimePicker) {
-        ThemedTimePickerDialog(
-            state = endTimePickerState,
-            accent = accent,
-            surfColor = surfColor,
-            textColor = textColor,
-            isDark = isDark,
-            onDismiss = { showEndTimePicker = false },
-            onConfirm = {
-                endTime = formatTime(endTimePickerState.hour, endTimePickerState.minute)
-                showEndTimePicker = false
-            }
-        )
-    }
-
     if (showPermissionDialog) {
         AlertDialog(
             onDismissRequest = { showPermissionDialog = false },
@@ -595,13 +509,122 @@ fun AddEventScreen(
                     val intent = android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
                         data = android.net.Uri.fromParts("package", context.packageName, null)
                     }
-                    context.startActivity(intent) // Redirects to OS Settings!
+                    context.startActivity(intent)
                 }) {
                     Text("Go to Settings", color = accent)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showPermissionDialog = false }) { Text("Cancel", color = Color.Gray) }
+            }
+        )
+    }
+
+    // 1. Start Date Picker
+    if (showStartDatePicker) {
+        val parsedStartDateMs: Long? = remember(startDate) {
+            try {
+                val format = SimpleDateFormat("MMM dd, yyyy", Locale.US)
+                format.timeZone = java.util.TimeZone.getTimeZone("UTC")
+                format.parse(startDate)?.time
+            } catch (e: Exception) { null }
+        }
+        val startDatePickerState = rememberDatePickerState(initialSelectedDateMillis = parsedStartDateMs)
+
+        ThemedDatePickerDialog(
+            state = startDatePickerState,
+            accent = accent,
+            surfColor = surfColor,
+            textColor = textColor,
+            onDismiss = { showStartDatePicker = false },
+            onConfirm = {
+                startDatePickerState.selectedDateMillis?.let {
+                    val format = SimpleDateFormat("MMM dd, yyyy", Locale.US)
+                    format.timeZone = java.util.TimeZone.getTimeZone("UTC")
+                    val d = format.format(Date(it))
+                    startDate = d
+                    endDate = d
+                }
+                showStartDatePicker = false
+            }
+        )
+    }
+
+    // 2. End Date Picker
+    if (showEndDatePicker) {
+        val parsedEndDateMs: Long? = remember(endDate) {
+            try {
+                val format = SimpleDateFormat("MMM dd, yyyy", Locale.US)
+                format.timeZone = java.util.TimeZone.getTimeZone("UTC")
+                format.parse(endDate)?.time
+            } catch (e: Exception) { null }
+        }
+        val endDatePickerState = rememberDatePickerState(initialSelectedDateMillis = parsedEndDateMs)
+
+        ThemedDatePickerDialog(
+            state = endDatePickerState,
+            accent = accent,
+            surfColor = surfColor,
+            textColor = textColor,
+            onDismiss = { showEndDatePicker = false },
+            onConfirm = {
+                endDatePickerState.selectedDateMillis?.let {
+                    val format = SimpleDateFormat("MMM dd, yyyy", Locale.US)
+                    format.timeZone = java.util.TimeZone.getTimeZone("UTC")
+                    endDate = format.format(Date(it))
+                }
+                showEndDatePicker = false
+            }
+        )
+    }
+
+    // 3. Start Time Picker
+    if (showStartTimePicker) {
+        val parsedStart: Pair<Int, Int> = remember(startTime) {
+            try {
+                val cal = Calendar.getInstance().apply { time = SimpleDateFormat("h:mm a", Locale.US).parse(startTime)!! }
+                cal.get(Calendar.HOUR_OF_DAY) to cal.get(Calendar.MINUTE)
+            } catch (e: Exception) { 9 to 0 }
+        }
+        val startTimePickerState = rememberTimePickerState(initialHour = parsedStart.first, initialMinute = parsedStart.second)
+
+        ThemedTimePickerDialog(
+            state = startTimePickerState,
+            accent = accent,
+            surfColor = surfColor,
+            textColor = textColor,
+            isDark = isDark,
+            onDismiss = { showStartTimePicker = false },
+            onConfirm = {
+                val h = startTimePickerState.hour
+                val m = startTimePickerState.minute
+                startTime = formatTime(h, m)
+                endTime = formatTime((h + 1) % 24, m)
+                showStartTimePicker = false
+            }
+        )
+    }
+
+    // 4. End Time Picker
+    if (showEndTimePicker) {
+        val parsedEnd: Pair<Int, Int> = remember(endTime) {
+            try {
+                val cal = Calendar.getInstance().apply { time = SimpleDateFormat("h:mm a", Locale.US).parse(endTime)!! }
+                cal.get(Calendar.HOUR_OF_DAY) to cal.get(Calendar.MINUTE)
+            } catch (e: Exception) { 10 to 0 }
+        }
+        val endTimePickerState = rememberTimePickerState(initialHour = parsedEnd.first, initialMinute = parsedEnd.second)
+
+        ThemedTimePickerDialog(
+            state = endTimePickerState,
+            accent = accent,
+            surfColor = surfColor,
+            textColor = textColor,
+            isDark = isDark,
+            onDismiss = { showEndTimePicker = false },
+            onConfirm = {
+                endTime = formatTime(endTimePickerState.hour, endTimePickerState.minute)
+                showEndTimePicker = false
             }
         )
     }
