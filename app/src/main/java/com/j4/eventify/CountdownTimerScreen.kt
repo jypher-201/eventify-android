@@ -308,9 +308,12 @@ fun CountdownTimerScreen(
             ) {
                 ModernInfoCard(
                     icon      = Icons.Default.CalendarToday,
-                    // ── THE FIX: Dynamically change title and scrub the text ──
-                    title     = if (event.dateTime.endsWith("(All Day)")) "Date" else "Date & Time",
-                    content   = event.dateTime.replace(" (All Day)", ""),
+                    // 1. Use our new database boolean instead of searching for text!
+                    title     = if (event.isAllDay) "Date" else "Date & Time",
+
+                    // 2. THE FIX: Replace the word " at " with a new line (\n)
+                    content   = event.dateTime.replace(" at ", "\n"),
+
                     textColor = textColor
                 )
                 ModernInfoCard(
