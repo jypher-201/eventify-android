@@ -72,11 +72,15 @@ fun CountdownTimerScreen(
     onNavigateBack: () -> Unit = {},
     onEdit: () -> Unit = {},
     onDelete: () -> Unit = {},
-    registry: EventTypeRegistry? = null
+    registry: EventTypeRegistry // 1. DELETE the "? = null" to force it to use the real registry
 ) {
-    // Use registry for live color updates; fall back to resolvedConfig for static default
-    val config = registry?.resolveForType(event.type, event.customConfig)
-        ?: event.resolvedConfig()
+    // 2. FORCE Compose to actively track the state just like we did in the HomeScreen!
+    val config = when (event.type) {
+        EventType.ACADEMIC -> registry.academic.toConfig()
+        EventType.PERSONAL -> registry.personal.toConfig()
+        EventType.OCCASION -> registry.occasion.toConfig()
+        EventType.CUSTOM -> event.customConfig ?: registry.academic.toConfig()
+    }
 
     val backgroundColor = Brush.linearGradient(
         listOf(config.gradientStart, config.gradientEnd)
@@ -85,6 +89,7 @@ fun CountdownTimerScreen(
 
     var showDeleteDialog by remember { mutableStateOf(false) }
     var timeRemaining by remember { mutableStateOf(calculateTimeRemaining(event.countdownNumber)) }
+    
 
     LaunchedEffect(event.id) {
         while (true) {

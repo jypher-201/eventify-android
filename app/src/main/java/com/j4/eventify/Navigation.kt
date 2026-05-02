@@ -139,7 +139,11 @@ fun EventifyNavigation(
 fun mapEntityToUiEvent(entity: com.j4.eventify.data.local.EventEntity): com.j4.eventify.components.Event {
     val date = java.util.Date(entity.timestamp)
     val formatter = java.text.SimpleDateFormat("MMM dd, yyyy 'at' h:mm a", java.util.Locale.getDefault())
-    val dateString = formatter.format(date)
+    var dateString = formatter.format(date)
+
+    if (dateString.endsWith("at 12:00 AM")) {
+        dateString = dateString.replace("at 12:00 AM", "(All Day)")
+    }
 
     val diffInMillis = entity.timestamp - System.currentTimeMillis()
     val diffInDays = java.util.concurrent.TimeUnit.MILLISECONDS.toDays(diffInMillis)
