@@ -264,7 +264,8 @@ fun EventCard(
                                 modifier = Modifier.size(15.dp)
                             )
                             Text(
-                                text      = event.dateTime,
+                                // ── THE FIX: Visually erase the tag! ──
+                                text      = event.dateTime.replace(" (All Day)", ""),
                                 fontSize  = 13.sp,
                                 fontWeight = FontWeight.Medium,
                                 color     = config.textColor.copy(alpha = 0.8f),

@@ -122,15 +122,38 @@ fun AddEventScreen(
     val savedTime = prefilledEvent?.dateTime?.substringAfter(" at ", "9:00 AM") ?: "9:00 AM"
     val wasAllDay = savedTime == "12:00 AM"
 
-    var startDate by remember { mutableStateOf(prefilledEvent?.dateTime?.substringBefore(" at ") ?: prefilledDate ?: "Feb 25, 2024") }
-    var endDate   by remember { mutableStateOf(prefilledEvent?.dateTime?.substringBefore(" at ") ?: prefilledDate ?: "Feb 25, 2024") }
+    // 1. Detect if it's an all-day event based on our new "(All Day)" UI string
+    val isPrefilledAllDay = prefilledEvent?.dateTime?.endsWith("(All Day)") == true
 
-    // 2. Set the toggle based on our check
-    var isAllDay  by remember { mutableStateOf(wasAllDay) }
+    // 2. Safely extract just the date part (strip away the " (All Day)" or " at 10:00 AM")
+    var startDate by remember {
+        mutableStateOf(
+            prefilledEvent?.dateTime?.replace(" (All Day)", "")?.substringBefore(" at ")
+                ?: prefilledDate
+                ?: "Feb 25, 2024"
+        )
+    }
 
-    // 3. If it was all day, reset the hidden time box to 9 AM just in case they turn the switch off!
-    var startTime by remember { mutableStateOf(if (wasAllDay) "9:00 AM" else savedTime) }
-    var endTime   by remember { mutableStateOf("10:00 AM") }
+    var endDate by remember {
+        mutableStateOf(
+            prefilledEvent?.dateTime?.replace(" (All Day)", "")?.substringBefore(" at ")
+                ?: prefilledDate
+                ?: "Feb 25, 2024"
+        )
+    }
+
+    // 3. Set the toggle automatically based on our check
+    var isAllDay by remember { mutableStateOf(isPrefilledAllDay) }
+
+    // 4. Safely extract the time (or default back to 9 AM if they turn the switch off)
+    var startTime by remember {
+        mutableStateOf(
+            if (isPrefilledAllDay) "9:00 AM"
+            else prefilledEvent?.dateTime?.substringAfter(" at ", "9:00 AM") ?: "9:00 AM"
+        )
+    }
+
+    var endTime by remember { mutableStateOf("10:00 AM") }
 
     var notes     by remember { mutableStateOf(prefilledEvent?.notes ?: "") }
 
