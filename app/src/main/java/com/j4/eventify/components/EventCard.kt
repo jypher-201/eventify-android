@@ -243,7 +243,7 @@ fun EventCard(
                                     .padding(horizontal = 9.dp, vertical = 5.dp)
                             ) {
                                 Text(
-                                    text          = config.label,
+                                    text          = config.label.uppercase(), // <--- Force it to UPPERCASE here!
                                     fontSize      = 10.sp,
                                     fontWeight    = FontWeight.Black,
                                     color         = config.badgeColor,

@@ -93,7 +93,7 @@ data class BuiltInTypeState(
         }
         return EventTypeConfig(
             type          = type,
-            label         = label.uppercase(),
+            label         = label,
             gradientStart = pair.first,
             gradientEnd   = pair.second,
             textColor     = textColor,
@@ -135,10 +135,10 @@ class EventTypeRegistry(context: Context) {
         )
     )
 
-    var customTypes by mutableStateOf(listOf<EventTypeConfig>())
+    // ── NEW: Load custom types from SharedPreferences on startup ──
+    var customTypes by mutableStateOf(loadCustomTypes())
         private set
 
-    // NEW: Permanently save changes to SharedPreferences
     fun updateBuiltIn(state: BuiltInTypeState) {
         when (state.type) {
             EventType.ACADEMIC -> academic = state
@@ -153,9 +153,54 @@ class EventTypeRegistry(context: Context) {
             .apply()
     }
 
-    fun addCustomType(config: EventTypeConfig) { customTypes = customTypes + config }
-    fun removeCustomType(config: EventTypeConfig) { customTypes = customTypes - config }
-    fun updateCustomType(old: EventTypeConfig, new: EventTypeConfig) { customTypes = customTypes.map { if (it == old) new else it } }
+    // ── NEW: Functions to automatically save and load the custom list ──
+    fun addCustomType(config: EventTypeConfig) {
+        if (!customTypes.any { it.label == config.label }) {
+            customTypes = customTypes + config
+            saveCustomTypes()
+        }
+    }
+
+    fun removeCustomType(config: EventTypeConfig) {
+        customTypes = customTypes - config
+        saveCustomTypes()
+    }
+
+    fun updateCustomType(old: EventTypeConfig, new: EventTypeConfig) {
+        customTypes = customTypes.map { if (it == old) new else it }
+        saveCustomTypes()
+    }
+
+    private fun saveCustomTypes() {
+        val stringSet = customTypes.map { cfg ->
+            // FIX: Change coerceAtLeast(3) to coerceAtLeast(0)
+            val index = gradientPalette.indexOfFirst { it.first == cfg.gradientStart }.coerceAtLeast(0)
+            "${cfg.label}|$index"
+        }.toSet()
+        prefs.edit().putStringSet("CUSTOM_TYPES_LIST", stringSet).apply()
+    }
+
+    private fun loadCustomTypes(): List<EventTypeConfig> {
+        val savedSet = prefs.getStringSet("CUSTOM_TYPES_LIST", emptySet()) ?: emptySet()
+        return savedSet.mapNotNull { savedString ->
+            val parts = savedString.split("|")
+            if (parts.size == 2) {
+                val label = parts[0]
+                // FIX: Change default from 3 to 0
+                val index = parts[1].toIntOrNull() ?: 0
+                val pair = gradientPalette[index.coerceIn(0, gradientPalette.lastIndex)]
+
+                EventTypeConfig(
+                    type = EventType.CUSTOM,
+                    label = label,
+                    gradientStart = pair.first,
+                    gradientEnd = pair.second,
+                    textColor = textColorForGradient(pair.first),
+                    badgeColor = badgeColorForGradient(pair.first, pair.second)
+                )
+            } else null
+        }.sortedBy { it.label } // Keeps them alphabetical in your menus!
+    }
 
     fun academicConfig() = academic.toConfig()
     fun personalConfig() = personal.toConfig()

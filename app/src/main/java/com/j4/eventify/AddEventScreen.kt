@@ -184,7 +184,7 @@ fun AddEventScreen(
                         val chosenGradient = if (selectedType == EventType.CUSTOM) {
                             com.j4.eventify.components.gradientPalette.indexOfFirst {
                                 it.first == selectedCustomCfg?.gradientStart
-                            }.coerceAtLeast(3) // Default to custom blue if not found
+                            }.coerceAtLeast(0) // FIX: Change coerceAtLeast(3) to 0!
                         } else {
                             when (selectedType) {
                                 EventType.ACADEMIC -> registry.academic.gradientIndex
@@ -381,7 +381,7 @@ fun AddEventScreen(
                 val pair = gradientPalette[result.gradientIndex]
                 val cfg  = EventTypeConfig(
                     type          = EventType.CUSTOM,
-                    label         = result.label.uppercase().take(10),
+                    label         = result.label.take(10),
                     gradientStart = pair.first,
                     gradientEnd   = pair.second,
                     textColor     = textColorForGradient(pair.first),

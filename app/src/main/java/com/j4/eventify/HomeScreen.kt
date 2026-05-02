@@ -34,7 +34,6 @@ import kotlinx.coroutines.launch
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.j4.eventify.data.EventViewModel
 import com.j4.eventify.data.EventViewModelFactory
-import com.j4.eventify.data.local.EventEntity
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -126,7 +125,10 @@ fun HomeScreen(
     var selectedCalendarDate by remember { mutableStateOf<String?>(null) }
     var showAboutDialog      by remember { mutableStateOf(false) }
     var showCustomTypeDialog by remember { mutableStateOf(false) }
+
     var editingBuiltIn by remember { mutableStateOf<BuiltInTypeState?>(null) }
+    var editingCustom  by remember { mutableStateOf<com.j4.eventify.components.EventTypeConfig?>(null) }
+
     val backgroundColor    = getBackgroundColor(currentTheme)
     val accentColor        = getAccentColor(currentTheme)
     val textColor          = getTextColor(currentTheme)
@@ -140,7 +142,6 @@ fun HomeScreen(
     // 2. CONVERT ENTITIES TO UI EVENTS ON THE FLY
     val realEvents = remember(entityList) {
         entityList.map { entity ->
-            // Use the brilliant mapper we already built in Navigation.kt!
             mapEntityToUiEvent(entity)
         }
     }
@@ -193,7 +194,8 @@ fun HomeScreen(
                 textColor      = textColor,
                 surfaceColor   = surfaceColor,
                 registry       = registry,
-                onEditBuiltIn  = { editingBuiltIn = it }
+                onEditBuiltIn  = { editingBuiltIn = it },
+                onEditCustom   = { editingCustom = it }
             )
         },
         content = {
@@ -216,7 +218,7 @@ fun HomeScreen(
                             timeFilter     = TimeFilter.ALL
                             selectedCalendarDate = null
                         },
-                        isFiltered = isFiltered,
+                        isFiltered         = isFiltered,
                         topBarColor        = topBarColor,
                         topBarContentColor = topBarContentColor,
                         surfaceColor       = surfaceColor,
@@ -244,18 +246,21 @@ fun HomeScreen(
                                 ) {
                                     items(filteredAndSortedEvents, key = { it.id }) { event ->
 
-                                        // 1. Force Compose to track the specific state for THIS type
                                         val latestConfig = when (event.type) {
                                             EventType.ACADEMIC -> registry.academic.toConfig()
                                             EventType.PERSONAL -> registry.personal.toConfig()
                                             EventType.OCCASION -> registry.occasion.toConfig()
-                                            EventType.CUSTOM -> event.customConfig ?: registry.academic.toConfig()
+                                            EventType.CUSTOM -> {
+                                                // ── THE FIX: Look up the live edited color from the Sidebar! ──
+                                                val liveCategory = registry.customTypes.find { it.label == event.customConfig?.label }
+                                                liveCategory ?: event.customConfig ?: registry.academic.toConfig()
+                                            }
                                         }
 
                                         EventCard(
                                             event          = event,
                                             onClick        = { onNavigateToEventDetails(event.id) },
-                                            overrideConfig = latestConfig // 2. Pass the explicitly tracked config!
+                                            overrideConfig = latestConfig
                                         )
 
                                     }
@@ -275,7 +280,11 @@ fun HomeScreen(
                                             EventType.ACADEMIC -> registry.academic.toConfig()
                                             EventType.PERSONAL -> registry.personal.toConfig()
                                             EventType.OCCASION -> registry.occasion.toConfig()
-                                            EventType.CUSTOM -> event.customConfig ?: registry.academic.toConfig()
+                                            EventType.CUSTOM -> {
+                                                // ── THE FIX AGAIN! ──
+                                                val liveCategory = registry.customTypes.find { it.label == event.customConfig?.label }
+                                                liveCategory ?: event.customConfig ?: registry.academic.toConfig()
+                                            }
                                         }
                                     }
                                 )
@@ -310,9 +319,33 @@ fun HomeScreen(
                     gradientIndex = result.gradientIndex,
                     iconKey       = result.iconKey
                 )
-                // THE FIX: Call our new permanent save function
                 registry.updateBuiltIn(updated)
                 editingBuiltIn = null
+            }
+        )
+    }
+
+    editingCustom?.let { cfg ->
+        val currentIndex = com.j4.eventify.components.gradientPalette.indexOfFirst { it.first == cfg.gradientStart }.coerceAtLeast(0)
+
+        EditTypeDialog(
+            initialLabel    = cfg.label,
+            initialGradient = currentIndex,
+            initialIconKey  = BuiltInIcon.STAR,
+            surfColor       = surfaceColor,
+            textColor       = textColor,
+            onDismiss       = { editingCustom = null },
+            onConfirm       = { result ->
+                val pair = com.j4.eventify.components.gradientPalette[result.gradientIndex]
+                val updated = cfg.copy(
+                    label         = result.label,
+                    gradientStart = pair.first,
+                    gradientEnd   = pair.second,
+                    textColor     = com.j4.eventify.components.textColorForGradient(pair.first),
+                    badgeColor    = com.j4.eventify.components.badgeColorForGradient(pair.first, pair.second)
+                )
+                registry.updateCustomType(cfg, updated)
+                editingCustom = null
             }
         )
     }
@@ -358,6 +391,7 @@ fun ModernTopBar(
     currentTheme: AppTheme
 ) {
     var isSearchExpanded by remember { mutableStateOf(false) }
+
     val focusRequester   = remember { FocusRequester() }
     val focusManager     = LocalFocusManager.current
 
@@ -595,7 +629,8 @@ fun ModernDrawer(
     textColor: Color,
     surfaceColor: Color,
     registry: EventTypeRegistry,
-    onEditBuiltIn: (BuiltInTypeState) -> Unit = {}
+    onEditBuiltIn: (BuiltInTypeState) -> Unit = {},
+    onEditCustom: (com.j4.eventify.components.EventTypeConfig) -> Unit = {}
 ) {
     ModalDrawerSheet(
         drawerContainerColor = surfaceColor,
@@ -647,7 +682,8 @@ fun ModernDrawer(
                         config    = cfg,
                         selected  = selectedFilter == EventType.CUSTOM,
                         textColor = textColor,
-                        onClick   = { onFilterSelected(EventType.CUSTOM) }
+                        onClick   = { onFilterSelected(EventType.CUSTOM) },
+                        onEditClick = { onEditCustom(cfg) }
                     )
                 }
             }
