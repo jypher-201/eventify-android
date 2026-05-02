@@ -140,17 +140,21 @@ fun AddEventScreen(
 
     var isAllDay by remember { mutableStateOf(isPrefilledAllDay) }
 
+    val calendar = remember { Calendar.getInstance() }
+    val currentHour = calendar.get(Calendar.HOUR_OF_DAY)
+    val currentMinute = calendar.get(Calendar.MINUTE)
+
     var startTime by remember {
         mutableStateOf(
             prefilledEvent?.rawStartMs?.let { SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(it)) }
-                ?.takeIf { !isPrefilledAllDay } ?: "9:00 AM"
+                ?.takeIf { !isPrefilledAllDay } ?: formatTime(currentHour, currentMinute)
         )
     }
 
     var endTime by remember {
         mutableStateOf(
             prefilledEvent?.rawEndMs?.let { SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(it)) }
-                ?.takeIf { !isPrefilledAllDay } ?: "10:00 AM"
+                ?.takeIf { !isPrefilledAllDay } ?: formatTime((currentHour + 1) % 24, currentMinute)
         )
     }
 
@@ -469,7 +473,7 @@ fun AddEventScreen(
                 startDatePickerState.selectedDateMillis?.let {
                     val d = SimpleDateFormat("MMM dd, yyyy", Locale.US).format(Date(it))
                     startDate = d
-                    if (isAllDay) endDate = d
+                    endDate = d // <--- THE FIX: End Date instantly follows Start Date!
                 }
                 showStartDatePicker = false
             }
@@ -503,7 +507,12 @@ fun AddEventScreen(
             isDark = isDark,
             onDismiss = { showStartTimePicker = false },
             onConfirm = {
-                startTime = formatTime(startTimePickerState.hour, startTimePickerState.minute)
+                val h = startTimePickerState.hour
+                val m = startTimePickerState.minute
+
+                startTime = formatTime(h, m)
+                endTime = formatTime((h + 1) % 24, m) // <--- THE FIX: End Time instantly jumps +1 hour!
+
                 showStartTimePicker = false
             }
         )
