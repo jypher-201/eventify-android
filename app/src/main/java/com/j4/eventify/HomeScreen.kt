@@ -113,7 +113,7 @@ fun HomeScreen(
     onNavigateToEventDetails: (Int) -> Unit = {},
     currentTheme: AppTheme = AppTheme.DEFAULT,
     onThemeChange: (AppTheme) -> Unit = {},
-    registry: EventTypeRegistry = remember { EventTypeRegistry() }
+    registry: EventTypeRegistry
 ) {
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -135,41 +135,13 @@ fun HomeScreen(
     val topBarContentColor = getTopBarContentColor(currentTheme)
 
     // 1. COLLECT THE REAL DATABASE FLOW
-    val entityList by viewModel.allEvents.collectAsState()
+    val entityList by viewModel.allEvents.collectAsState(initial = emptyList())
 
     // 2. CONVERT ENTITIES TO UI EVENTS ON THE FLY
     val realEvents = remember(entityList) {
         entityList.map { entity ->
-            val date = Date(entity.timestamp)
-            val formatter = SimpleDateFormat("MMM dd, yyyy 'at' h:mm a", Locale.getDefault())
-            val dateString = formatter.format(date)
-
-            val diffInMillis = entity.timestamp - System.currentTimeMillis()
-            val diffInDays = TimeUnit.MILLISECONDS.toDays(diffInMillis)
-
-            val (countNum, countLabel) = when {
-                diffInDays > 1 -> Pair(diffInDays.toString(), "DAYS LEFT")
-                diffInDays == 1L -> Pair("1", "DAY LEFT")
-                diffInDays == 0L && diffInMillis > 0 -> Pair("NOW", "HAPPENING")
-                diffInMillis <= 0 -> Pair("DONE", "PASSED")
-                else -> Pair("--", "")
-            }
-
-            val typeEnum = try {
-                EventType.valueOf(entity.eventType)
-            } catch (e: Exception) {
-                EventType.PERSONAL
-            }
-
-            com.j4.eventify.components.Event(
-                id = entity.id,
-                title = entity.title,
-                type = typeEnum,
-                dateTime = dateString,
-                countdownNumber = countNum,
-                countdownLabel = countLabel,
-                notes = entity.description ?: ""
-            )
+            // Use the brilliant mapper we already built in Navigation.kt!
+            mapEntityToUiEvent(entity)
         }
     }
 
@@ -271,13 +243,21 @@ fun HomeScreen(
                                     verticalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     items(filteredAndSortedEvents, key = { it.id }) { event ->
-                                        // Used a safe call for customConfig here in case your Event class supports it!
-                                        val customCfg = try { event.javaClass.getMethod("getCustomConfig").invoke(event) as? com.j4.eventify.components.EventTypeConfig } catch (e: Exception) { null }
+
+                                        // 1. Force Compose to track the specific state for THIS type
+                                        val latestConfig = when (event.type) {
+                                            EventType.ACADEMIC -> registry.academic.toConfig()
+                                            EventType.PERSONAL -> registry.personal.toConfig()
+                                            EventType.OCCASION -> registry.occasion.toConfig()
+                                            EventType.CUSTOM -> event.customConfig ?: registry.academic.toConfig()
+                                        }
+
                                         EventCard(
                                             event          = event,
                                             onClick        = { onNavigateToEventDetails(event.id) },
-                                            overrideConfig = registry.resolveForType(event.type, customCfg)
+                                            overrideConfig = latestConfig // 2. Pass the explicitly tracked config!
                                         )
+
                                     }
                                 }
                             }
@@ -291,8 +271,12 @@ fun HomeScreen(
                                     textColor       = textColor,
                                     surfaceColor    = surfaceColor,
                                     configResolver  = { event ->
-                                        val customCfg = try { event.javaClass.getMethod("getCustomConfig").invoke(event) as? com.j4.eventify.components.EventTypeConfig } catch (e: Exception) { null }
-                                        registry.resolveForType(event.type, customCfg)
+                                        when (event.type) {
+                                            EventType.ACADEMIC -> registry.academic.toConfig()
+                                            EventType.PERSONAL -> registry.personal.toConfig()
+                                            EventType.OCCASION -> registry.occasion.toConfig()
+                                            EventType.CUSTOM -> event.customConfig ?: registry.academic.toConfig()
+                                        }
                                     }
                                 )
                             }
@@ -326,12 +310,8 @@ fun HomeScreen(
                     gradientIndex = result.gradientIndex,
                     iconKey       = result.iconKey
                 )
-                when (state.type) {
-                    EventType.ACADEMIC -> registry.academic = updated
-                    EventType.PERSONAL -> registry.personal = updated
-                    EventType.OCCASION -> registry.occasion = updated
-                    else -> {}
-                }
+                // THE FIX: Call our new permanent save function
+                registry.updateBuiltIn(updated)
                 editingBuiltIn = null
             }
         )
@@ -614,7 +594,7 @@ fun ModernDrawer(
     accentColor: Color,
     textColor: Color,
     surfaceColor: Color,
-    registry: EventTypeRegistry = EventTypeRegistry(),
+    registry: EventTypeRegistry,
     onEditBuiltIn: (BuiltInTypeState) -> Unit = {}
 ) {
     ModalDrawerSheet(

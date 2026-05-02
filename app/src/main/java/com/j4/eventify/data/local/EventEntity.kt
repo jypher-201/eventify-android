@@ -21,5 +21,8 @@ data class EventEntity(
     val remindBeforeMinutes: Int?, // e.g., 15 mins, 60 mins, or 1440 (1 day)
 
     // New: Holiday Flag
-    val isPhilippineHoliday: Boolean = false // Helps filter auto-added holidays
+    val isPhilippineHoliday: Boolean = false, // Helps filter auto-added holidays
+
+    val gradientIndex: Int = 0,       // Remembers the specific color!
+    val customLabel: String? = null
 )

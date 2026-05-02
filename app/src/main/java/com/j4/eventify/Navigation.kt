@@ -28,20 +28,22 @@ object Routes {
 
 @Composable
 fun EventifyNavigation(
-    // 1. We inject the ViewModel right at the root of the app
     viewModel: EventViewModel = viewModel(factory = EventViewModelFactory)
 ) {
     val navController = rememberNavController()
 
-    // 2. We collect the live database flow here so the navigation system knows about all real events
+    // 1. Grab the context
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    // 2. We collect the live database flow here
     val entityList by viewModel.allEvents.collectAsState(initial = emptyList())
 
     // rememberSaveable survives back-stack pops AND config changes.
     var themeOrdinal by rememberSaveable { mutableStateOf(AppTheme.DEFAULT.ordinal) }
     val currentTheme = AppTheme.entries[themeOrdinal]
 
-    // Single source of truth for all event types
-    val registry = remember { EventTypeRegistry() }
+    // 3. THIS MUST BE THE ONLY REGISTRY LINE! (Delete any other 'val registry...' lines)
+    val registry = remember { EventTypeRegistry(context) }
 
     NavHost(
         navController    = navController,
@@ -131,6 +133,9 @@ fun EventifyNavigation(
 // ─────────────────────────────────────────────
 // Database to UI Mapper Helper
 // ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// Database to UI Mapper Helper
+// ─────────────────────────────────────────────
 fun mapEntityToUiEvent(entity: com.j4.eventify.data.local.EventEntity): com.j4.eventify.components.Event {
     val date = java.util.Date(entity.timestamp)
     val formatter = java.text.SimpleDateFormat("MMM dd, yyyy 'at' h:mm a", java.util.Locale.getDefault())
@@ -153,6 +158,18 @@ fun mapEntityToUiEvent(entity: com.j4.eventify.data.local.EventEntity): com.j4.e
         com.j4.eventify.components.EventType.PERSONAL
     }
 
+    // 1. REBUILD THE SAVED COLOR FROM THE DATABASE
+    val pair = com.j4.eventify.components.gradientPalette[entity.gradientIndex.coerceIn(0, com.j4.eventify.components.gradientPalette.lastIndex)]
+    val rebuiltConfig = com.j4.eventify.components.EventTypeConfig(
+        type = typeEnum,
+        label = entity.customLabel ?: typeEnum.name, // Use custom name if it exists
+        gradientStart = pair.first,
+        gradientEnd = pair.second,
+        textColor = com.j4.eventify.components.textColorForGradient(pair.first),
+        badgeColor = com.j4.eventify.components.badgeColorForGradient(pair.first, pair.second)
+    )
+
+    // 2. ATTACH IT TO THE EVENT
     return com.j4.eventify.components.Event(
         id = entity.id,
         title = entity.title,
@@ -160,6 +177,7 @@ fun mapEntityToUiEvent(entity: com.j4.eventify.data.local.EventEntity): com.j4.e
         dateTime = dateString,
         countdownNumber = countNum,
         countdownLabel = countLabel,
-        notes = entity.description ?: ""
+        notes = entity.description ?: "",
+        customConfig = rebuiltConfig // <--- Restores the exact color to the UI!
     )
 }

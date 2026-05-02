@@ -89,7 +89,7 @@ fun AddEventScreen(
     onNavigateBack: () -> Unit = {},
     prefilledDate: String? = null,
     currentTheme: AppTheme = AppTheme.DEFAULT,
-    registry: EventTypeRegistry = androidx.compose.runtime.remember { EventTypeRegistry() },
+    registry: EventTypeRegistry, // <--- DELETE the "=" and everything after it!
     prefilledEvent: Event? = null,
     // 1. We no longer need the dummy onSaveEvent lambda.
     // 2. Just inject the ViewModel directly:
@@ -171,9 +171,7 @@ fun AddEventScreen(
                 onNavigateBack = onNavigateBack,
                 onSave = {
                     if (title.isNotBlank()) {
-                        // 1. Secretly force the time to Midnight if All Day is toggled on
                         val finalTime = if (isAllDay) "12:00 AM" else startTime
-
                         val fullDateString = "$startDate at $finalTime"
                         val format = SimpleDateFormat("MMM dd, yyyy 'at' h:mm a", Locale.getDefault())
                         val timestamp = try {
@@ -182,27 +180,36 @@ fun AddEventScreen(
                             System.currentTimeMillis()
                         }
 
-                        // 2. Build the Room Entity
+                        // 1. Figure out which color index they are using
+                        val chosenGradient = if (selectedType == EventType.CUSTOM) {
+                            com.j4.eventify.components.gradientPalette.indexOfFirst {
+                                it.first == selectedCustomCfg?.gradientStart
+                            }.coerceAtLeast(3) // Default to custom blue if not found
+                        } else {
+                            when (selectedType) {
+                                EventType.ACADEMIC -> registry.academic.gradientIndex
+                                EventType.PERSONAL -> registry.personal.gradientIndex
+                                EventType.OCCASION -> registry.occasion.gradientIndex
+                                else -> 0
+                            }
+                        }
+
+                        // 2. Build the upgraded Room Entity
                         val newEvent = EventEntity(
                             id = prefilledEvent?.id ?: 0,
                             title = title.trim(),
                             description = notes.trim().ifEmpty { null },
-                            eventType = if (selectedType == EventType.CUSTOM) {
-                                selectedCustomCfg?.label ?: EventType.CUSTOM.name
-                            } else {
-                                selectedType.name
-                            },
+                            eventType = selectedType.name, // Always save the pure enum name
                             timestamp = timestamp,
                             locationName = location.trim().ifEmpty { null },
                             latitude = null,
                             longitude = null,
-                            remindBeforeMinutes = null
+                            remindBeforeMinutes = null,
+                            gradientIndex = chosenGradient,             // <--- Saves the color!
+                            customLabel = selectedCustomCfg?.label      // <--- Saves the custom name!
                         )
 
-                        // 3. Save or Update the Database
-                        viewModel.addEvent(newEvent) // Room's "REPLACE" strategy handles the update automatically!
-
-                        // 4. Return to HomeScreen
+                        viewModel.addEvent(newEvent)
                         onNavigateBack()
                     }
                 },
@@ -629,7 +636,7 @@ fun AddEventTypeSelector(
     accent: Color,
     surfColor: Color,
     isDark: Boolean,
-    registry: EventTypeRegistry = EventTypeRegistry()
+    registry: EventTypeRegistry
 ) {
     LazyRow(
         modifier              = Modifier.fillMaxWidth(),

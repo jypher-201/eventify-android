@@ -11,9 +11,16 @@ fun getEventTypeColor(type: EventType): Color {
         EventType.ACADEMIC -> AcademicBlue
         EventType.PERSONAL -> PersonalPink
         EventType.OCCASION -> OccasionYellow
-        EventType.CUSTOM   -> Color(0xFF667eea) // fallback; use resolvedConfig for accurate color
+        EventType.CUSTOM   -> Color(0xFF667eea)
     }
 }
 
-// Preferred: get the exact gradient start color for any event, including custom types
-fun Event.getDisplayColor(): Color = resolvedConfig().gradientStart
+// ── THE FIX: ALWAYS check the database's customConfig first! ──
+fun Event.getDisplayColor(): Color {
+    // If we mapped a saved color from the database, use it immediately
+    if (this.customConfig != null) {
+        return this.customConfig.gradientStart
+    }
+    // Otherwise, fall back to the original hardcoded logic
+    return resolvedConfig().gradientStart
+}

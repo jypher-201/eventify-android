@@ -7,8 +7,8 @@ import androidx.room.RoomDatabase
 
 @Database(
     entities = [EventEntity::class],
-    version = 1,
-    exportSchema = false // Set to true later if you want to track database version history
+    version = 2, // <--- CRITICAL: Change this from 1 to 2!
+    exportSchema = false
 )
 abstract class EventDatabase : RoomDatabase() {
 
@@ -19,16 +19,13 @@ abstract class EventDatabase : RoomDatabase() {
         private var INSTANCE: EventDatabase? = null
 
         fun getDatabase(context: Context): EventDatabase {
-            // If the INSTANCE is not null, then return it,
-            // if it is, then create the database
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     EventDatabase::class.java,
                     "eventify_database"
                 )
-                    // Wipes and rebuilds instead of migrating if no Migration object.
-                    // Useful during early development while you are tweaking the Entity.
+                    // Leaves the parentheses completely empty!
                     .fallbackToDestructiveMigration()
                     .build()
 
