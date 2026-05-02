@@ -1,6 +1,7 @@
 package com.j4.eventify
 
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -27,44 +28,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.j4.eventify.components.Event
 import com.j4.eventify.components.EventType
-import com.j4.eventify.components.resolvedConfig
 import com.j4.eventify.EventTypeRegistry
 import com.j4.eventify.ui.theme.*
 import androidx.compose.foundation.layout.statusBarsPadding
 import java.util.Locale
-
-data class TimeRemaining(
-    val days: Int,
-    val hours: Int,
-    val minutes: Int,
-    val seconds: Int
-)
-
-// Cached once — TimeZone.getTimeZone() reads from disk and is slow if called repeatedly
-private val philippinesZone: java.util.TimeZone =
-    java.util.TimeZone.getTimeZone("Asia/Manila")
-
-fun calculateTimeRemaining(countdownNumber: String): TimeRemaining {
-    val now    = java.util.Calendar.getInstance(philippinesZone)
-    val target = now.clone() as java.util.Calendar
-
-    val daysFromNow = countdownNumber.toIntOrNull() ?: 0
-    target.add(java.util.Calendar.DAY_OF_MONTH, daysFromNow)
-    target.set(java.util.Calendar.HOUR_OF_DAY, 23)
-    target.set(java.util.Calendar.MINUTE, 59)
-    target.set(java.util.Calendar.SECOND, 59)
-
-    val diff = target.timeInMillis - now.timeInMillis
-    if (diff <= 0) return TimeRemaining(0, 0, 0, 0)
-
-    val totalSeconds = diff / 1000
-    return TimeRemaining(
-        days    = (totalSeconds / (24 * 60 * 60)).toInt().coerceAtLeast(0),
-        hours   = ((totalSeconds % (24 * 60 * 60)) / (60 * 60)).toInt().coerceAtLeast(0),
-        minutes = ((totalSeconds % (60 * 60)) / 60).toInt().coerceAtLeast(0),
-        seconds = (totalSeconds % 60).toInt().coerceAtLeast(0)
-    )
-}
 
 @Composable
 fun CountdownTimerScreen(
@@ -72,15 +39,13 @@ fun CountdownTimerScreen(
     onNavigateBack: () -> Unit = {},
     onEdit: () -> Unit = {},
     onDelete: () -> Unit = {},
-    registry: EventTypeRegistry // 1. DELETE the "? = null" to force it to use the real registry
+    registry: EventTypeRegistry
 ) {
-    // 2. FORCE Compose to actively track the state just like we did in the HomeScreen!
     val config = when (event.type) {
         EventType.ACADEMIC -> registry.academic.toConfig()
         EventType.PERSONAL -> registry.personal.toConfig()
         EventType.OCCASION -> registry.occasion.toConfig()
         EventType.CUSTOM -> {
-            // ── THE FIX: Look up the live category and ignore case! ──
             val liveCategory = registry.customTypes.find {
                 it.label.equals(event.customConfig?.label, ignoreCase = true)
             }
@@ -94,15 +59,37 @@ fun CountdownTimerScreen(
     val textColor = config.textColor
 
     var showDeleteDialog by remember { mutableStateOf(false) }
-    var timeRemaining by remember { mutableStateOf(calculateTimeRemaining(event.countdownNumber)) }
 
+    // ─────────────────────────────────────────────
+    // NEW SMART TIMER ENGINE
+    // ─────────────────────────────────────────────
+    var currentTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
 
-    LaunchedEffect(event.id) {
+    LaunchedEffect(Unit) {
         while (true) {
+            currentTime = System.currentTimeMillis()
             kotlinx.coroutines.delay(1000L)
-            timeRemaining = calculateTimeRemaining(event.countdownNumber)
         }
     }
+
+    // Safely figure out the End Time (Default to 1 hour, or 24 hours if All Day)
+    val effectiveEndMs = event.rawEndMs ?: if (event.isAllDay) event.rawStartMs + 86400000L else event.rawStartMs + 3600000L
+
+    // Determine the exact State of the event
+    val isFinished = currentTime > effectiveEndMs
+    val isOngoing = currentTime >= event.rawStartMs && currentTime <= effectiveEndMs
+
+    // Target the Start Time if upcoming, Target the End Time if ongoing!
+    val targetTime = if (isOngoing) effectiveEndMs else event.rawStartMs
+
+    // Never allow negative numbers!
+    val diffInMillis = (targetTime - currentTime).coerceAtLeast(0L)
+
+    val days = java.util.concurrent.TimeUnit.MILLISECONDS.toDays(diffInMillis)
+    val hours = java.util.concurrent.TimeUnit.MILLISECONDS.toHours(diffInMillis) % 24
+    val minutes = java.util.concurrent.TimeUnit.MILLISECONDS.toMinutes(diffInMillis) % 60
+    val seconds = java.util.concurrent.TimeUnit.MILLISECONDS.toSeconds(diffInMillis) % 60
+    // ─────────────────────────────────────────────
 
     val infiniteTransition = rememberInfiniteTransition(label = "rotation")
     val rotation by infiniteTransition.animateFloat(
@@ -118,7 +105,7 @@ fun CountdownTimerScreen(
     var visible by remember { mutableStateOf(false) }
     val alpha by animateFloatAsState(
         targetValue   = if (visible) 1f else 0f,
-        animationSpec = tween(350),   // was 800 — shorter feels snappier without losing elegance
+        animationSpec = tween(350),
         label         = "fade_in"
     )
     LaunchedEffect(Unit) { visible = true }
@@ -132,7 +119,7 @@ fun CountdownTimerScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .navigationBarsPadding() // <--- ADD THIS LINE HERE
+                .navigationBarsPadding()
                 .padding(horizontal = 24.dp, vertical = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
@@ -192,114 +179,159 @@ fun CountdownTimerScreen(
                             .border(4.dp, textColor.copy(alpha = 0.15f), CircleShape)
                     )
 
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(20.dp)
-                    ) {
-                        val showDays    = timeRemaining.days > 0
-                        val showHours   = timeRemaining.hours > 0 || showDays
-                        val showMinutes = timeRemaining.minutes > 0 || showHours
-                        val showSeconds = true
+                    // ─────────────────────────────────────────────
+                    // UI STATE MACHINE (Finished vs Ongoing vs Upcoming)
+                    // ─────────────────────────────────────────────
+                    if (isFinished) {
+                        Text(
+                            text = "EVENT\nCOMPLETED",
+                            fontSize = 28.sp,
+                            fontWeight = FontWeight.Black,
+                            color = textColor.copy(alpha = 0.6f),
+                            textAlign = TextAlign.Center,
+                            lineHeight = 34.sp
+                        )
+                    } else if (isOngoing) {
+                        // Pulsing Animation Engine
+                        val infinitePulse = rememberInfiniteTransition(label = "pulse")
+                        val pulseAlpha by infinitePulse.animateFloat(
+                            initialValue = 0.3f,
+                            targetValue = 1f,
+                            animationSpec = infiniteRepeatable(
+                                animation = tween(1000, easing = FastOutSlowInEasing),
+                                repeatMode = RepeatMode.Reverse
+                            ),
+                            label = "pulse_alpha"
+                        )
 
-                        val activeUnits = listOf(showDays, showHours, showMinutes, showSeconds).count { it }
-
-                        val numberSize = when (activeUnits) {
-                            1    -> 72.sp
-                            2    -> 64.sp
-                            3    -> 58.sp
-                            else -> 56.sp
-                        }
-                        val labelSize = when (activeUnits) {
-                            1    -> 14.sp
-                            2    -> 12.sp
-                            else -> 11.sp
-                        }
-
-                        if (showDays || showHours) {
-                            Row(
-                                horizontalArrangement = Arrangement.Center,
-                                verticalAlignment     = Alignment.Top
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Surface(
+                                shape = RoundedCornerShape(20.dp),
+                                color = textColor.copy(alpha = 0.15f * pulseAlpha),
+                                border = BorderStroke(1.dp, textColor.copy(alpha = pulseAlpha))
                             ) {
-                                if (showDays) {
-                                    AnimatedTimeUnit(
-                                        value      = String.format(Locale.US, "%02d", timeRemaining.days),
-                                        label      = "DAYS",
-                                        color      = textColor,
-                                        numberSize = numberSize,
-                                        labelSize  = labelSize
-                                    )
-                                    if (showHours) {
-                                        Text(
-                                            text       = ":",
-                                            fontSize   = numberSize,
-                                            fontWeight = FontWeight.Black,
-                                            color      = textColor,
-                                            modifier   = Modifier.padding(horizontal = 12.dp),
-                                            fontFamily = FontFamily.Default
-                                        )
-                                    }
-                                }
-                                if (showHours) {
-                                    AnimatedTimeUnit(
-                                        value      = String.format(Locale.US, "%02d", timeRemaining.hours),
-                                        label      = "HOURS",
-                                        color      = textColor,
-                                        numberSize = numberSize,
-                                        labelSize  = labelSize
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(textColor.copy(alpha = pulseAlpha)))
+                                    Text(
+                                        "HAPPENING NOW",
+                                        color = textColor.copy(alpha = pulseAlpha),
+                                        fontWeight = FontWeight.Bold,
+                                        letterSpacing = 1.sp,
+                                        fontSize = 14.sp
                                     )
                                 }
                             }
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = String.format(Locale.US, "Ends in %02d:%02d:%02d", hours, minutes, seconds),
+                                fontSize = 22.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = textColor.copy(alpha = 0.8f)
+                            )
                         }
+                    } else {
+                        // Standard Upcoming Timer
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(20.dp)
+                        ) {
+                            val showDays    = days > 0
+                            val showHours   = hours > 0 || showDays
+                            val showMinutes = minutes > 0 || showHours
+                            val showSeconds = true
 
-                        if (showMinutes || showSeconds) {
-                            Row(
-                                horizontalArrangement = Arrangement.Center,
-                                verticalAlignment     = Alignment.Top
-                            ) {
-                                if (showMinutes) {
-                                    AnimatedTimeUnit(
-                                        value      = String.format(Locale.US, "%02d", timeRemaining.minutes),
-                                        label      = "MINS",
-                                        color      = textColor,
-                                        numberSize = numberSize,
-                                        labelSize  = labelSize
-                                    )
-                                    if (showSeconds) {
-                                        Text(
-                                            text       = ":",
-                                            fontSize   = numberSize,
-                                            fontWeight = FontWeight.Black,
+                            val activeUnits = listOf(showDays, showHours, showMinutes, showSeconds).count { it }
+
+                            val numberSize = when (activeUnits) {
+                                1    -> 72.sp
+                                2    -> 64.sp
+                                3    -> 58.sp
+                                else -> 56.sp
+                            }
+                            val labelSize = when (activeUnits) {
+                                1    -> 14.sp
+                                2    -> 12.sp
+                                else -> 11.sp
+                            }
+
+                            if (showDays || showHours) {
+                                Row(
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment     = Alignment.Top
+                                ) {
+                                    if (showDays) {
+                                        AnimatedTimeUnit(
+                                            value      = String.format(Locale.US, "%02d", days),
+                                            label      = "DAYS",
                                             color      = textColor,
-                                            modifier   = Modifier.padding(horizontal = 12.dp),
-                                            fontFamily = FontFamily.Default
+                                            numberSize = numberSize,
+                                            labelSize  = labelSize
+                                        )
+                                        if (showHours) {
+                                            Text(
+                                                text       = ":",
+                                                fontSize   = numberSize,
+                                                fontWeight = FontWeight.Black,
+                                                color      = textColor,
+                                                modifier   = Modifier.padding(horizontal = 12.dp),
+                                                fontFamily = FontFamily.Default
+                                            )
+                                        }
+                                    }
+                                    if (showHours) {
+                                        AnimatedTimeUnit(
+                                            value      = String.format(Locale.US, "%02d", hours),
+                                            label      = "HOURS",
+                                            color      = textColor,
+                                            numberSize = numberSize,
+                                            labelSize  = labelSize
                                         )
                                     }
                                 }
-                                if (showSeconds) {
-                                    AnimatedTimeUnit(
-                                        value      = String.format(Locale.US, "%02d", timeRemaining.seconds),
-                                        label      = "SECS",
-                                        color      = textColor,
-                                        numberSize = numberSize,
-                                        labelSize  = labelSize
-                                    )
+                            }
+
+                            if (showMinutes || showSeconds) {
+                                Row(
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment     = Alignment.Top
+                                ) {
+                                    if (showMinutes) {
+                                        AnimatedTimeUnit(
+                                            value      = String.format(Locale.US, "%02d", minutes),
+                                            label      = "MINS",
+                                            color      = textColor,
+                                            numberSize = numberSize,
+                                            labelSize  = labelSize
+                                        )
+                                        if (showSeconds) {
+                                            Text(
+                                                text       = ":",
+                                                fontSize   = numberSize,
+                                                fontWeight = FontWeight.Black,
+                                                color      = textColor,
+                                                modifier   = Modifier.padding(horizontal = 12.dp),
+                                                fontFamily = FontFamily.Default
+                                            )
+                                        }
+                                    }
+                                    if (showSeconds) {
+                                        AnimatedTimeUnit(
+                                            value      = String.format(Locale.US, "%02d", seconds),
+                                            label      = "SECS",
+                                            color      = textColor,
+                                            numberSize = numberSize,
+                                            labelSize  = labelSize
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
                 }
-            }
-
-            if (timeRemaining.days == 0 && timeRemaining.hours == 0 &&
-                timeRemaining.minutes == 0 && timeRemaining.seconds == 0) {
-                Text(
-                    text      = "🎉 EVENT TIME! 🎉",
-                    fontSize  = 24.sp,
-                    fontWeight = FontWeight.Black,
-                    color     = textColor,
-                    modifier  = Modifier.padding(vertical = 16.dp),
-                    textAlign = TextAlign.Center
-                )
             }
 
             Column(
@@ -308,18 +340,14 @@ fun CountdownTimerScreen(
             ) {
                 ModernInfoCard(
                     icon      = Icons.Default.CalendarToday,
-                    // 1. Use our new database boolean instead of searching for text!
                     title     = if (event.isAllDay) "Date" else "Date & Time",
-
-                    // 2. THE FIX: Replace the word " at " with a new line (\n)
                     content   = event.dateTime.replace(" at ", "\n"),
-
                     textColor = textColor
                 )
                 ModernInfoCard(
                     icon      = Icons.AutoMirrored.Filled.Label,
                     title     = "Event Type",
-                    content   = config.label,   // use config label, not enum name
+                    content   = config.label,
                     textColor = textColor
                 )
                 if (event.notes.isNotEmpty()) {
