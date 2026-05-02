@@ -122,38 +122,37 @@ fun AddEventScreen(
     val savedTime = prefilledEvent?.dateTime?.substringAfter(" at ", "9:00 AM") ?: "9:00 AM"
     val wasAllDay = savedTime == "12:00 AM"
 
-    // 1. Detect if it's an all-day event based on our new "(All Day)" UI string
-    val isPrefilledAllDay = prefilledEvent?.dateTime?.endsWith("(All Day)") == true
+    val isPrefilledAllDay = prefilledEvent?.isAllDay == true
 
-    // 2. Safely extract just the date part (strip away the " (All Day)" or " at 10:00 AM")
     var startDate by remember {
         mutableStateOf(
-            prefilledEvent?.dateTime?.replace(" (All Day)", "")?.substringBefore(" at ")
-                ?: prefilledDate
-                ?: "Feb 25, 2024"
+            prefilledEvent?.rawStartMs?.let { SimpleDateFormat("MMM dd, yyyy", Locale.getDefault()).format(Date(it)) }
+                ?: prefilledDate ?: SimpleDateFormat("MMM dd, yyyy", Locale.getDefault()).format(Date())
         )
     }
 
     var endDate by remember {
         mutableStateOf(
-            prefilledEvent?.dateTime?.replace(" (All Day)", "")?.substringBefore(" at ")
-                ?: prefilledDate
-                ?: "Feb 25, 2024"
+            prefilledEvent?.rawEndMs?.let { SimpleDateFormat("MMM dd, yyyy", Locale.getDefault()).format(Date(it)) }
+                ?: startDate
         )
     }
 
-    // 3. Set the toggle automatically based on our check
     var isAllDay by remember { mutableStateOf(isPrefilledAllDay) }
 
-    // 4. Safely extract the time (or default back to 9 AM if they turn the switch off)
     var startTime by remember {
         mutableStateOf(
-            if (isPrefilledAllDay) "9:00 AM"
-            else prefilledEvent?.dateTime?.substringAfter(" at ", "9:00 AM") ?: "9:00 AM"
+            prefilledEvent?.rawStartMs?.let { SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(it)) }
+                ?.takeIf { !isPrefilledAllDay } ?: "9:00 AM"
         )
     }
 
-    var endTime by remember { mutableStateOf("10:00 AM") }
+    var endTime by remember {
+        mutableStateOf(
+            prefilledEvent?.rawEndMs?.let { SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(it)) }
+                ?.takeIf { !isPrefilledAllDay } ?: "10:00 AM"
+        )
+    }
 
     var notes     by remember { mutableStateOf(prefilledEvent?.notes ?: "") }
 
@@ -194,20 +193,26 @@ fun AddEventScreen(
                 onNavigateBack = onNavigateBack,
                 onSave = {
                     if (title.isNotBlank()) {
-                        val finalTime = if (isAllDay) "12:00 AM" else startTime
-                        val fullDateString = "$startDate at $finalTime"
-                        val format = SimpleDateFormat("MMM dd, yyyy 'at' h:mm a", Locale.getDefault())
-                        val timestamp = try {
-                            format.parse(fullDateString)?.time ?: System.currentTimeMillis()
-                        } catch (e: Exception) {
-                            System.currentTimeMillis()
-                        }
+                        // 1. Calculate Start Timestamp
+                        val finalStartTime = if (isAllDay) "12:00 AM" else startTime
+                        val startFullDateString = "$startDate at $finalStartTime"
+                        val format = java.text.SimpleDateFormat("MMM dd, yyyy 'at' h:mm a", java.util.Locale.getDefault())
+                        val startTimestamp = try {
+                            format.parse(startFullDateString)?.time ?: System.currentTimeMillis()
+                        } catch (e: Exception) { System.currentTimeMillis() }
 
-                        // 1. Figure out which color index they are using
+                        // 2. Calculate End Timestamp
+                        val finalEndTime = if (isAllDay) "12:00 AM" else endTime
+                        val endFullDateString = "$endDate at $finalEndTime"
+                        val endTimestamp = try {
+                            format.parse(endFullDateString)?.time
+                        } catch (e: Exception) { null }
+
+                        // 3. Figure out which color index they are using
                         val chosenGradient = if (selectedType == EventType.CUSTOM) {
                             com.j4.eventify.components.gradientPalette.indexOfFirst {
                                 it.first == selectedCustomCfg?.gradientStart
-                            }.coerceAtLeast(0) // FIX: Change coerceAtLeast(3) to 0!
+                            }.coerceAtLeast(0)
                         } else {
                             when (selectedType) {
                                 EventType.ACADEMIC -> registry.academic.gradientIndex
@@ -217,19 +222,20 @@ fun AddEventScreen(
                             }
                         }
 
-                        // 2. Build the upgraded Room Entity
+                        // 4. Build the upgraded Room Entity
                         val newEvent = EventEntity(
                             id = prefilledEvent?.id ?: 0,
                             title = title.trim(),
                             description = notes.trim().ifEmpty { null },
-                            eventType = selectedType.name, // Always save the pure enum name
-                            timestamp = timestamp,
+                            eventType = selectedType.name,
+                            timestamp = startTimestamp,
+                            endTimestamp = endTimestamp,
                             locationName = location.trim().ifEmpty { null },
                             latitude = null,
                             longitude = null,
                             remindBeforeMinutes = null,
-                            gradientIndex = chosenGradient,             // <--- Saves the color!
-                            customLabel = selectedCustomCfg?.label      // <--- Saves the custom name!
+                            gradientIndex = chosenGradient,
+                            customLabel = selectedCustomCfg?.label
                         )
 
                         viewModel.addEvent(newEvent)

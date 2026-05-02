@@ -136,52 +136,83 @@ fun EventifyNavigation(
 // ─────────────────────────────────────────────
 // Database to UI Mapper Helper
 // ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// Database to UI Mapper Helper
+// ─────────────────────────────────────────────
 fun mapEntityToUiEvent(entity: com.j4.eventify.data.local.EventEntity): com.j4.eventify.components.Event {
-    val date = java.util.Date(entity.timestamp)
-    val formatter = java.text.SimpleDateFormat("MMM dd, yyyy 'at' h:mm a", java.util.Locale.getDefault())
-    var dateString = formatter.format(date)
 
-    if (dateString.endsWith("at 12:00 AM")) {
-        dateString = dateString.replace("at 12:00 AM", "(All Day)")
+    // 1. Resolve Type and Custom Config
+    val type = try {
+        com.j4.eventify.components.EventType.valueOf(entity.eventType)
+    } catch (e: Exception) {
+        com.j4.eventify.components.EventType.ACADEMIC
     }
 
+    val customCfg = if (type == com.j4.eventify.components.EventType.CUSTOM) {
+        val pair = com.j4.eventify.components.gradientPalette[entity.gradientIndex.coerceIn(0, com.j4.eventify.components.gradientPalette.lastIndex)]
+        com.j4.eventify.components.EventTypeConfig(
+            type = com.j4.eventify.components.EventType.CUSTOM,
+            label = entity.customLabel ?: "CUSTOM",
+            gradientStart = pair.first,
+            gradientEnd = pair.second,
+            textColor = com.j4.eventify.components.textColorForGradient(pair.first),
+            badgeColor = com.j4.eventify.components.badgeColorForGradient(pair.first, pair.second)
+        )
+    } else null
+
+    // 2. Format Start and End Dates
+    val formatFull = java.text.SimpleDateFormat("MMM dd, yyyy 'at' h:mm a", java.util.Locale.getDefault())
+    val formatDate = java.text.SimpleDateFormat("MMM dd, yyyy", java.util.Locale.getDefault())
+    val formatTime = java.text.SimpleDateFormat("h:mm a", java.util.Locale.getDefault())
+
+    val startDate = java.util.Date(entity.timestamp)
+    val startStrFull = formatFull.format(startDate)
+    val isAllDay = startStrFull.endsWith("12:00 AM")
+
+    val d1 = formatDate.format(startDate)
+    val t1 = formatTime.format(startDate)
+
+    var displayString = ""
+
+    if (entity.endTimestamp != null && entity.endTimestamp != entity.timestamp) {
+        val endDate = java.util.Date(entity.endTimestamp)
+        val d2 = formatDate.format(endDate)
+        val t2 = formatTime.format(endDate)
+
+        if (isAllDay) {
+            displayString = if (d1 == d2) d1 else "$d1 - $d2"
+        } else {
+            displayString = if (d1 == d2) "$d1 at $t1 - $t2" else "$d1 at $t1 - $d2 at $t2"
+        }
+    } else {
+        displayString = if (isAllDay) d1 else "$d1 at $t1"
+    }
+
+    // 3. Calculate Countdown
     val diffInMillis = entity.timestamp - System.currentTimeMillis()
     val diffInDays = java.util.concurrent.TimeUnit.MILLISECONDS.toDays(diffInMillis)
 
-    val (countNum, countLabel) = when {
-        diffInDays > 1 -> Pair(diffInDays.toString(), "DAYS LEFT")
-        diffInDays == 1L -> Pair("1", "DAY LEFT")
-        diffInDays == 0L && diffInMillis > 0 -> Pair("NOW", "HAPPENING")
-        diffInMillis <= 0 -> Pair("DONE", "PASSED")
-        else -> Pair("--", "")
+    val (countdownNumber, countdownLabel) = when {
+        diffInDays > 0 -> diffInDays.toString() to "DAYS"
+        diffInDays == 0L && diffInMillis > 0 -> {
+            val hours = java.util.concurrent.TimeUnit.MILLISECONDS.toHours(diffInMillis)
+            if (hours > 0) hours.toString() to "HOURS" else "!" to "SOON"
+        }
+        else -> "0" to "DAYS"
     }
 
-    val typeEnum = try {
-        com.j4.eventify.components.EventType.valueOf(entity.eventType)
-    } catch (e: Exception) {
-        com.j4.eventify.components.EventType.PERSONAL
-    }
-
-    // 1. REBUILD THE SAVED COLOR FROM THE DATABASE
-    val pair = com.j4.eventify.components.gradientPalette[entity.gradientIndex.coerceIn(0, com.j4.eventify.components.gradientPalette.lastIndex)]
-    val rebuiltConfig = com.j4.eventify.components.EventTypeConfig(
-        type = typeEnum,
-        label = entity.customLabel ?: typeEnum.name, // Use custom name if it exists
-        gradientStart = pair.first,
-        gradientEnd = pair.second,
-        textColor = com.j4.eventify.components.textColorForGradient(pair.first),
-        badgeColor = com.j4.eventify.components.badgeColorForGradient(pair.first, pair.second)
-    )
-
-    // 2. ATTACH IT TO THE EVENT
+    // 4. Return the fully mapped Event
     return com.j4.eventify.components.Event(
         id = entity.id,
         title = entity.title,
-        type = typeEnum,
-        dateTime = dateString,
-        countdownNumber = countNum,
-        countdownLabel = countLabel,
+        type = type,
+        dateTime = displayString,
+        countdownNumber = countdownNumber,
+        countdownLabel = countdownLabel,
         notes = entity.description ?: "",
-        customConfig = rebuiltConfig // <--- Restores the exact color to the UI!
+        customConfig = customCfg,
+        rawStartMs = entity.timestamp,
+        rawEndMs = entity.endTimestamp,
+        isAllDay = isAllDay
     )
 }

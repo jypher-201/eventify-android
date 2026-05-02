@@ -125,7 +125,10 @@ data class Event(
     val countdownLabel: String,
     val notes: String = "",
     // Optional: custom type config (non-null for CUSTOM events)
-    val customConfig: EventTypeConfig? = null
+    val customConfig: EventTypeConfig? = null,
+    val rawStartMs: Long = 0L,
+    val rawEndMs: Long? = null,
+    val isAllDay: Boolean = false
 )
 
 // Resolve the config to use for rendering

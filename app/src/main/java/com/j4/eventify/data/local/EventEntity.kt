@@ -10,7 +10,8 @@ data class EventEntity(
     val title: String,
     val description: String?,
     val eventType: String, // Maps to your EventTypeRegistry
-    val timestamp: Long, // Storing dates as Long (Unix time) is best for Room
+    val timestamp: Long,
+    val endTimestamp: Long? = null,
 
     // New: Location Data
     val locationName: String?,
