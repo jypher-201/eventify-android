@@ -36,11 +36,14 @@ fun LocationPicker(
     textColor: Color
 ) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope() // ── NEEDED FOR REVERSE GEOCODING ──
+    val scope = rememberCoroutineScope()
 
     var expanded by remember { mutableStateOf(false) }
     var searchResults by remember { mutableStateOf<List<OsmPlace>>(emptyList()) }
     var isFetchingGps by remember { mutableStateOf(false) }
+
+    // ── THE FIX: A simple flag to tell the search engine to ignore the next text change ──
+    var skipNextSearch by remember { mutableStateOf(false) }
 
     val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
 
@@ -50,17 +53,17 @@ fun LocationPicker(
             fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
                 .addOnSuccessListener { location ->
                     if (location != null) {
-                        // ── THE FIX: Ask OpenStreetMap what place this GPS coordinate is! ──
                         scope.launch {
                             try {
                                 val place = LocationClient.api.reverseGeocode(location.latitude, location.longitude)
-                                // Grab just the first part of the address so it isn't super long
                                 val shortName = place.displayName.split(",").first()
 
+                                // ── Trigger the skip flag before sending the text! ──
+                                skipNextSearch = true
                                 onLocationSelected(shortName, location.latitude, location.longitude)
                                 expanded = false
                             } catch (e: Exception) {
-                                // If the internet fails, fallback to standard text
+                                skipNextSearch = true
                                 onLocationSelected("Current GPS Location", location.latitude, location.longitude)
                                 expanded = false
                             } finally {
@@ -96,6 +99,12 @@ fun LocationPicker(
     }
 
     LaunchedEffect(currentLocationName) {
+        // ── THE FIX: If the flag is raised, lower it and skip the search ──
+        if (skipNextSearch) {
+            skipNextSearch = false
+            return@LaunchedEffect
+        }
+
         if (currentLocationName.length > 2 && currentLocationName != "Current GPS Location") {
             delay(600)
             try {
@@ -119,6 +128,8 @@ fun LocationPicker(
             OutlinedTextField(
                 value = currentLocationName,
                 onValueChange = { newText ->
+                    // ── If the user is typing manually, ensure the flag is off ──
+                    skipNextSearch = false
                     onLocationSelected(newText, null, null)
                 },
                 placeholder = { Text("Add location", color = textColor.copy(alpha = 0.38f), fontSize = 16.sp) },
@@ -167,6 +178,9 @@ fun LocationPicker(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable {
+                                    // ── Trigger the skip flag before sending the text! ──
+                                    skipNextSearch = true
+
                                     onLocationSelected(
                                         place.displayName.split(",").first(),
                                         place.lat.toDoubleOrNull(),
