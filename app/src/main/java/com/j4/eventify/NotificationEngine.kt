@@ -62,7 +62,14 @@ class EventAlarmScheduler(private val context: Context) {
         // Only set alarms for the future
         if (triggerTimeMs > System.currentTimeMillis()) {
             try {
-                alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerTimeMs, pendingIntent)
+                // ── THE FIX: Use setAlarmClock for military-grade precision! ──
+                val alarmClockInfo = AlarmManager.AlarmClockInfo(
+                    triggerTimeMs,
+                    pendingIntent // This intent handles what happens if the user clicks the alarm icon in the status bar (we just reuse our trigger intent)
+                )
+
+                alarmManager.setAlarmClock(alarmClockInfo, pendingIntent)
+
             } catch (e: SecurityException) {
                 // Failsafe if exact alarms are disabled globally by the user
             }
