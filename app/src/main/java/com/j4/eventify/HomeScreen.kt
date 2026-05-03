@@ -283,16 +283,83 @@ fun HomeScreen(
         expandEventsForCurrentYear(baseFilteredEvents)
     }
 
-    // 5. APPLY TIME FILTERS TO LIST VIEW GHOSTS
+    // 5. APPLY TIME FILTERS & SMART SORTING TO LIST VIEW GHOSTS
+    // 5. APPLY TIME FILTERS & SMART SORTING TO LIST VIEW GHOSTS
     val listFilteredAndSorted = remember(timeFilter, listViewEvents) {
-        val timeFiltered = when (timeFilter) {
-            TimeFilter.ALL        -> listViewEvents
-            TimeFilter.TODAY      -> listViewEvents.filter { (it.countdownNumber.toIntOrNull() ?: 999) == 0 }
-            TimeFilter.TOMORROW   -> listViewEvents.filter { (it.countdownNumber.toIntOrNull() ?: 999) == 1 }
-            TimeFilter.THIS_WEEK  -> listViewEvents.filter { (it.countdownNumber.toIntOrNull() ?: 999) in 0..7 }
-            TimeFilter.THIS_MONTH -> listViewEvents.filter { (it.countdownNumber.toIntOrNull() ?: 999) in 0..30 }
+        val now = System.currentTimeMillis()
+
+        val calNow = Calendar.getInstance().apply {
+            // ── THE FIX: Force the calendar to group Monday-Sunday as ONE week! ──
+            firstDayOfWeek = Calendar.MONDAY
         }
-        timeFiltered.sortedBy { it.countdownNumber.toIntOrNull() ?: 999 }
+        val currentYear = calNow.get(Calendar.YEAR)
+        val currentMonth = calNow.get(Calendar.MONTH)
+        val currentWeek = calNow.get(Calendar.WEEK_OF_YEAR)
+        val currentDayOfYear = calNow.get(Calendar.DAY_OF_YEAR)
+
+        calNow.add(Calendar.DAY_OF_YEAR, 1)
+        val tomorrowYear = calNow.get(Calendar.YEAR)
+        val tomorrowDayOfYear = calNow.get(Calendar.DAY_OF_YEAR)
+
+        // ── STEP 1: The Fix for Time Filters (Using True Calendar Boundaries) ──
+        val timeFiltered = listViewEvents.filter { event ->
+            if (timeFilter == TimeFilter.ALL) return@filter true
+
+            val calEvent = Calendar.getInstance().apply {
+                // ── Match the same Monday-Sunday rule for the event! ──
+                firstDayOfWeek = Calendar.MONDAY
+                timeInMillis = event.rawStartMs
+            }
+            val eventYear = calEvent.get(Calendar.YEAR)
+            val eventMonth = calEvent.get(Calendar.MONTH)
+            val eventWeek = calEvent.get(Calendar.WEEK_OF_YEAR)
+            val eventDayOfYear = calEvent.get(Calendar.DAY_OF_YEAR)
+
+            when (timeFilter) {
+                TimeFilter.TODAY      -> (currentYear == eventYear && currentDayOfYear == eventDayOfYear)
+                TimeFilter.TOMORROW   -> (tomorrowYear == eventYear && tomorrowDayOfYear == eventDayOfYear)
+                TimeFilter.THIS_WEEK  -> (currentYear == eventYear && currentWeek == eventWeek)
+                TimeFilter.THIS_MONTH -> (currentYear == eventYear && currentMonth == eventMonth)
+                else -> true
+            }
+        }
+
+        // ── STEP 2: The 3-Tier Smart Sort ──
+        timeFiltered.sortedWith(
+            compareBy<Event> { event ->
+                val fallbackDuration = if (event.isAllDay) 86400000L else 3600000L
+                val endTime = event.rawEndMs ?: (event.rawStartMs + fallbackDuration)
+
+                val calEvent = Calendar.getInstance().apply { timeInMillis = event.rawStartMs }
+                val isToday = (currentYear == calEvent.get(Calendar.YEAR) && currentDayOfYear == calEvent.get(Calendar.DAY_OF_YEAR))
+                val isPassed = endTime < now
+
+                // Bucket 0 = Today (Absolute Top VIPs)
+                // Bucket 1 = Upcoming (Middle)
+                // Bucket 2 = Passed (Bottom)
+                when {
+                    isToday -> 0
+                    !isPassed -> 1
+                    else -> 2
+                }
+
+            }.thenBy { event ->
+                val fallbackDuration = if (event.isAllDay) 86400000L else 3600000L
+                val endTime = event.rawEndMs ?: (event.rawStartMs + fallbackDuration)
+
+                val calEvent = Calendar.getInstance().apply { timeInMillis = event.rawStartMs }
+                val isToday = (currentYear == calEvent.get(Calendar.YEAR) && currentDayOfYear == calEvent.get(Calendar.DAY_OF_YEAR))
+                val isPassed = endTime < now
+
+                if (isToday || !isPassed) {
+                    // Sort Today and Upcoming ascending (Morning first, Next day first)
+                    event.rawStartMs
+                } else {
+                    // Sort Past events descending (Yesterday comes before Last Week)
+                    -event.rawStartMs
+                }
+            }
+        )
     }
 
     val isFiltered = selectedFilter != null ||
