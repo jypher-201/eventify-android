@@ -19,7 +19,7 @@ data class EventEntity(
     val longitude: Double? = null, // Future-proofed for map pins!
 
     // New: Notification Preference
-    val remindBeforeMinutes: Int?, // e.g., 15 mins, 60 mins, or 1440 (1 day)
+    val remindBeforeMinutes: List<Int> = emptyList(), // e.g., 15 mins, 60 mins, or 1440 (1 day)
 
     // New: Holiday Flag
     val isPhilippineHoliday: Boolean = false, // Helps filter auto-added holidays

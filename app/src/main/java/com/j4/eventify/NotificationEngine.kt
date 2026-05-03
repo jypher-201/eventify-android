@@ -43,35 +43,49 @@ class EventNotificationReceiver : BroadcastReceiver() {
 // 2. The Scheduler: This does the math and sets the exact Android Alarm
 class EventAlarmScheduler(private val context: Context) {
     fun schedule(event: EventEntity) {
-        if (event.remindBeforeMinutes == null) return
+        if (event.remindBeforeMinutes.isEmpty()) return
 
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        val intent = Intent(context, EventNotificationReceiver::class.java).apply {
-            putExtra("EVENT_ID", event.id)
-            putExtra("EVENT_TITLE", event.title)
-            putExtra("EVENT_DESC", "Starting in ${event.remindBeforeMinutes} minutes!")
-        }
 
-        val pendingIntent = PendingIntent.getBroadcast(
-            context, event.id, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
+        // ── Loop through every reminder the user selected ──
+        event.remindBeforeMinutes.forEach { minutes ->
 
-        // Calculate the exact millisecond to fire the alarm
-        val triggerTimeMs = event.timestamp - (event.remindBeforeMinutes * 60 * 1000L)
+            // Build a human-readable string for the notification text
+            val timeText = when {
+                minutes >= 60 * 24 -> "${minutes / (60 * 24)} days"
+                minutes >= 60 -> "${minutes / 60} hours"
+                else -> "$minutes minutes"
+            }
 
-        // Only set alarms for the future
-        if (triggerTimeMs > System.currentTimeMillis()) {
-            try {
-                // ── THE FIX: Use setAlarmClock for military-grade precision! ──
-                val alarmClockInfo = AlarmManager.AlarmClockInfo(
-                    triggerTimeMs,
-                    pendingIntent // This intent handles what happens if the user clicks the alarm icon in the status bar (we just reuse our trigger intent)
-                )
+            val intent = Intent(context, EventNotificationReceiver::class.java).apply {
+                putExtra("EVENT_ID", event.id)
+                putExtra("EVENT_TITLE", event.title)
+                putExtra("EVENT_DESC", "Starting in $timeText!")
+            }
 
-                alarmManager.setAlarmClock(alarmClockInfo, pendingIntent)
+            // ── THE FIX: Create a totally unique ID for this specific alarm! ──
+            // If we just use event.id, they overwrite each other.
+            // Multiplying by 10000 and adding the minutes creates a unique fingerprint.
+            val uniqueAlarmCode = (event.id * 10000) + minutes
 
-            } catch (e: SecurityException) {
-                // Failsafe if exact alarms are disabled globally by the user
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                uniqueAlarmCode,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            // Calculate the exact millisecond to fire this specific alarm
+            val triggerTimeMs = event.timestamp - (minutes * 60 * 1000L)
+
+            // Only set alarms for the future
+            if (triggerTimeMs > System.currentTimeMillis()) {
+                try {
+                    val alarmClockInfo = AlarmManager.AlarmClockInfo(triggerTimeMs, pendingIntent)
+                    alarmManager.setAlarmClock(alarmClockInfo, pendingIntent)
+                } catch (e: SecurityException) {
+                    // Failsafe
+                }
             }
         }
     }

@@ -133,7 +133,7 @@ data class Event(
     val rawStartMs: Long = 0L,
     val rawEndMs: Long? = null,
     val isAllDay: Boolean = false,
-    val remindBeforeMinutes: Int? = null,
+    val remindBeforeMinutes: List<Int> = emptyList(),
     val repeatMode: String? = null
 )
 

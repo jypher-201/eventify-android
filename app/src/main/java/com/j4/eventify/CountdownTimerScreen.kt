@@ -42,7 +42,9 @@ fun calculateNextOccurrence(startMs: Long, endMs: Long, repeatMode: String?, cur
     var currentStart = startMs
     var currentEnd = endMs
     val duration = endMs - startMs
-    val cal = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("Asia/Manila"))
+
+    // ── THE FIX: Removed hardcoded "Asia/Manila" to prevent system clock desyncs ──
+    val cal = java.util.Calendar.getInstance()
 
     val lower = repeatMode.lowercase()
     val parts = lower.split(" ")

@@ -4,12 +4,14 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.TypeConverters
 
 @Database(
     entities = [EventEntity::class],
     version = 4, // <--- CRITICAL: Change this from 1 to 2!
     exportSchema = false
 )
+@TypeConverters(Converters::class)
 abstract class EventDatabase : RoomDatabase() {
 
     abstract fun eventDao(): EventDao

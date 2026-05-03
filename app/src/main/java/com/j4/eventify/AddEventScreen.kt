@@ -55,18 +55,16 @@ private val standardNotificationOptions = listOf(
     NotificationOption("15 minutes before", "15m"),
     NotificationOption("30 minutes before", "30m"),
     NotificationOption("1 hour before",     "1h"),
+    NotificationOption("2 hours before",    "2h"),  // <--- Added!
     NotificationOption("1 day before",      "1d"),
+    NotificationOption("2 days before",     "2d"),  // <--- Added!
+    NotificationOption("1 week before",     "1w"),  // <--- Added!
     NotificationOption("Custom",            "custom")
 )
 
-fun getNotificationLabel(value: String): String = when (value) {
-    "5m"  -> "5 minutes before"
-    "10m" -> "10 minutes before"
-    "15m" -> "15 minutes before"
-    "30m" -> "30 minutes before"
-    "1h"  -> "1 hour before"
-    "1d"  -> "1 day before"
-    else  -> value
+// ── THE FIX: Dynamically search the list instead of hardcoding a 'when' block! ──
+fun getNotificationLabel(value: String): String {
+    return standardNotificationOptions.find { it.value == value }?.label ?: value
 }
 
 fun formatTime(hour: Int, minute: Int): String {
@@ -175,9 +173,10 @@ fun AddEventScreen(
 
     var notes     by remember { mutableStateOf(prefilledEvent?.notes ?: "") }
 
+    // ── THE FIX: Explicitly tell Kotlin this is a List of Strings! ──
     var notifications by remember {
-        mutableStateOf(
-            prefilledEvent?.remindBeforeMinutes?.let { listOf(formatMinutesToNotification(it)) } ?: emptyList()
+        mutableStateOf<List<String>>(
+            prefilledEvent?.remindBeforeMinutes?.map { formatMinutesToNotification(it) } ?: emptyList()
         )
     }
     var showNotifPicker  by remember { mutableStateOf(false) }
@@ -247,7 +246,7 @@ fun AddEventScreen(
                             }
                         }
 
-                        val remindMinutes = notifications.firstOrNull()?.let { parseNotificationToMinutes(it) }
+                        val remindMinutesList = notifications.mapNotNull { parseNotificationToMinutes(it) }
 
                         val newEvent = EventEntity(
                             id = prefilledEvent?.id ?: 0,
@@ -259,7 +258,7 @@ fun AddEventScreen(
                             locationName = location.trim().ifEmpty { null },
                             latitude = null,
                             longitude = null,
-                            remindBeforeMinutes = remindMinutes,
+                            remindBeforeMinutes = remindMinutesList,
                             gradientIndex = chosenGradient,
                             customLabel = selectedCustomCfg?.label,
                             repeatMode = if (repeatOption == "Does not repeat") null else repeatOption,
@@ -348,7 +347,8 @@ fun AddEventScreen(
                         showNotifPicker = true
                     }
                 },
-                onRemove      = { label -> notifications = notifications - label },
+                // ── THE FIX: Use .filter to safely remove the item! ──
+                onRemove      = { labelToRemove -> notifications = notifications.filter { it != labelToRemove } },
                 accent        = accent,
                 surfColor     = surfColor,
                 textColor     = textColor,
@@ -401,7 +401,10 @@ fun AddEventScreen(
                     showCustomDialog = true
                 } else {
                     val label = getNotificationLabel(value)
-                    if (!notifications.contains(label)) notifications = notifications + label
+                    // ── THE FIX: Create a fresh list with the new item! ──
+                    if (!notifications.contains(label)) {
+                        notifications = notifications.toMutableList().apply { add(label) }
+                    }
                     showNotifPicker = false
                 }
             }
@@ -415,7 +418,10 @@ fun AddEventScreen(
             textColor = textColor,
             onDismiss = { showCustomDialog = false },
             onConfirm = { customLabel ->
-                if (!notifications.contains(customLabel)) notifications = notifications + customLabel
+                // ── THE FIX: Create a fresh list with the new item! ──
+                if (!notifications.contains(customLabel)) {
+                    notifications = notifications.toMutableList().apply { add(customLabel) }
+                }
                 showCustomDialog = false
             }
         )
