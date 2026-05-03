@@ -214,11 +214,16 @@ fun HomeScreen(
     var timeFilter           by remember { mutableStateOf(TimeFilter.ALL) }
     var showTimeFilterMenu   by remember { mutableStateOf(false) }
     var selectedCalendarDate by remember { mutableStateOf<String?>(null) }
+
+    // NEW: Dialog States
     var showAboutDialog      by remember { mutableStateOf(false) }
+    var showSettingsDialog   by remember { mutableStateOf(false) }
     var showCustomTypeDialog by remember { mutableStateOf(false) }
 
-    var editingBuiltIn by remember { mutableStateOf<BuiltInTypeState?>(null) }
-    var editingCustom  by remember { mutableStateOf<com.j4.eventify.components.EventTypeConfig?>(null) }
+    // NEW: Settings States
+    var hiddenTypes          by remember { mutableStateOf(setOf<String>()) }
+    var editingBuiltIn       by remember { mutableStateOf<BuiltInTypeState?>(null) }
+    var editingCustom        by remember { mutableStateOf<com.j4.eventify.components.EventTypeConfig?>(null) }
 
     val backgroundColor    = getBackgroundColor(currentTheme)
     val accentColor        = getAccentColor(currentTheme)
@@ -278,8 +283,10 @@ fun HomeScreen(
                     selectedFilter = filter
                     scope.launch { drawerState.close() }
                 },
-                currentTheme     = currentTheme,
-                onThemeSelected  = { onThemeChange(it) },
+                onSettingsClick  = {
+                    showSettingsDialog = true
+                    scope.launch { drawerState.close() }
+                },
                 onAboutClick     = {
                     showAboutDialog = true
                     scope.launch { drawerState.close() }
@@ -288,8 +295,7 @@ fun HomeScreen(
                 textColor      = textColor,
                 surfaceColor   = surfaceColor,
                 registry       = registry,
-                onEditBuiltIn  = { editingBuiltIn = it },
-                onEditCustom   = { editingCustom = it }
+                hiddenTypes    = hiddenTypes
             )
         },
         content = {
@@ -341,7 +347,6 @@ fun HomeScreen(
                                     contentPadding      = PaddingValues(16.dp),
                                     verticalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    // Make keys unique to prevent crash on identical ghost clones
                                     items(listFilteredAndSorted, key = { "${it.id}_${it.rawStartMs}" }) { event ->
 
                                         val latestConfig = when (event.type) {
@@ -359,7 +364,7 @@ fun HomeScreen(
 
                                         EventCard(
                                             event          = event,
-                                            onClick        = { onNavigateToEventDetails(event.id) }, // Pass original DB ID
+                                            onClick        = { onNavigateToEventDetails(event.id) },
                                             overrideConfig = latestConfig
                                         )
 
@@ -408,6 +413,31 @@ fun HomeScreen(
         }
     )
 
+    // ─────────────────────────────────────────────
+    // NEW Settings Dialog Controller
+    // ─────────────────────────────────────────────
+    if (showSettingsDialog) {
+        SettingsDialog(
+            currentTheme = currentTheme,
+            onThemeSelected = onThemeChange,
+            registry = registry,
+            hiddenTypes = hiddenTypes,
+            onToggleVisibility = { label, isVisible ->
+                hiddenTypes = if (isVisible) hiddenTypes - label else hiddenTypes + label
+            },
+            onEditBuiltIn = { editingBuiltIn = it },
+            onEditCustom = { editingCustom = it },
+            onDeleteCustom = { registry.removeCustomType(it) }, // Safely deletes the category!
+            onDismiss = { showSettingsDialog = false },
+            surfColor = surfaceColor,
+            textColor = textColor,
+            accentColor = accentColor
+        )
+    }
+
+    // ─────────────────────────────────────────────
+    // Original EventType Dialogs (Reverted to Safe Signatures)
+    // ─────────────────────────────────────────────
     editingBuiltIn?.let { state ->
         EditTypeDialog(
             initialLabel    = state.label,
@@ -431,35 +461,10 @@ fun HomeScreen(
     editingCustom?.let { cfg ->
         val currentIndex = com.j4.eventify.components.gradientPalette.indexOfFirst { it.first == cfg.gradientStart }.coerceAtLeast(0)
 
-        // Read from the Base events so the event count is perfectly accurate!
-        val linkedEvents = baseEvents.filter {
-            it.type == EventType.CUSTOM && it.customConfig?.label.equals(cfg.label, ignoreCase = true)
-        }
-
         EditTypeDialog(
             initialLabel         = cfg.label,
             initialGradient      = currentIndex,
             initialIconKey       = cfg.iconKey ?: BuiltInIcon.STAR,
-            showDelete           = true,
-            associatedEventCount = linkedEvents.size,
-            onDelete = { moveToOther ->
-                linkedEvents.forEach { eventToMove ->
-                    val entity = entityList.find { it.id == eventToMove.id }
-                    if (entity != null) {
-                        if (moveToOther) {
-                            val safeEntity = entity.copy(
-                                eventType = EventType.OTHER.name,
-                                customLabel = null
-                            )
-                            viewModel.updateEvent(safeEntity)
-                        } else {
-                            viewModel.deleteEvent(entity)
-                        }
-                    }
-                }
-                registry.removeCustomType(cfg)
-                editingCustom = null
-            },
             surfColor       = surfaceColor,
             textColor       = textColor,
             onDismiss       = { editingCustom = null },
@@ -493,6 +498,147 @@ fun HomeScreen(
             onDismiss = { showCustomTypeDialog = false },
             onConfirm = { showCustomTypeDialog = false }
         )
+    }
+}
+
+// ─────────────────────────────────────────────
+// NEW Settings Dialog & Rows
+// ─────────────────────────────────────────────
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SettingsDialog(
+    currentTheme: AppTheme,
+    onThemeSelected: (AppTheme) -> Unit,
+    registry: EventTypeRegistry,
+    hiddenTypes: Set<String>,
+    onToggleVisibility: (String, Boolean) -> Unit,
+    onEditBuiltIn: (BuiltInTypeState) -> Unit,
+    onEditCustom: (com.j4.eventify.components.EventTypeConfig) -> Unit,
+    onDeleteCustom: (com.j4.eventify.components.EventTypeConfig) -> Unit,
+    onDismiss: () -> Unit,
+    surfColor: Color,
+    textColor: Color,
+    accentColor: Color
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = surfColor,
+        shape = RoundedCornerShape(24.dp),
+        title = {
+            Text("Settings", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = textColor)
+        },
+        text = {
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                // APPEARANCE SECTION
+                item {
+                    Text("APPEARANCE", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = accentColor, letterSpacing = 1.sp)
+                    Spacer(Modifier.height(8.dp))
+                    ThemeSelector(
+                        currentTheme = currentTheme,
+                        onThemeSelected = onThemeSelected,
+                        textColor = textColor
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    HorizontalDivider(color = textColor.copy(alpha = 0.1f))
+                }
+
+                // CATEGORIES SECTION
+                item {
+                    Text("EVENT CATEGORIES", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = accentColor, letterSpacing = 1.sp)
+                    Text("Check to show in navigation drawer", fontSize = 13.sp, color = textColor.copy(alpha = 0.5f))
+                    Spacer(Modifier.height(4.dp))
+                }
+
+                val builtIns = listOf(registry.academic, registry.personal, registry.occasion, registry.other)
+                items(builtIns) { state ->
+                    SettingsCategoryRow(
+                        label = state.label,
+                        color = state.toConfig().gradientStart,
+                        icon = state.iconKey.imageVector,
+                        isVisible = !hiddenTypes.contains(state.label),
+                        onVisibilityChange = { isVisible -> onToggleVisibility(state.label, isVisible) },
+                        onEdit = { onEditBuiltIn(state) },
+                        onDelete = null, // Built-ins cannot be deleted!
+                        textColor = textColor,
+                        accentColor = accentColor
+                    )
+                }
+
+                if (registry.customTypes.isNotEmpty()) {
+                    item {
+                        HorizontalDivider(color = textColor.copy(alpha = 0.05f), modifier = Modifier.padding(vertical = 4.dp))
+                    }
+                    items(registry.customTypes) { cfg ->
+                        SettingsCategoryRow(
+                            label = cfg.label,
+                            color = cfg.gradientStart,
+                            icon = cfg.iconKey?.imageVector ?: Icons.Default.Star,
+                            isVisible = !hiddenTypes.contains(cfg.label),
+                            onVisibilityChange = { isVisible -> onToggleVisibility(cfg.label, isVisible) },
+                            onEdit = { onEditCustom(cfg) },
+                            onDelete = { onDeleteCustom(cfg) }, // Custom types get the delete button
+                            textColor = textColor,
+                            accentColor = accentColor
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Done", color = accentColor, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            }
+        }
+    )
+}
+
+@Composable
+fun SettingsCategoryRow(
+    label: String,
+    color: Color,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    isVisible: Boolean,
+    onVisibilityChange: (Boolean) -> Unit,
+    onEdit: () -> Unit,
+    onDelete: (() -> Unit)?,
+    textColor: Color,
+    accentColor: Color
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Checkbox(
+            checked = isVisible,
+            onCheckedChange = onVisibilityChange,
+            colors = CheckboxDefaults.colors(
+                checkedColor = accentColor,
+                uncheckedColor = textColor.copy(alpha = 0.5f),
+                checkmarkColor = Color.White
+            )
+        )
+        Box(
+            modifier = Modifier.size(28.dp).clip(CircleShape).background(color.copy(alpha = 0.15f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(icon, null, tint = color, modifier = Modifier.size(16.dp))
+        }
+        Spacer(Modifier.width(12.dp))
+        Text(label, fontSize = 15.sp, color = textColor, modifier = Modifier.weight(1f))
+
+        IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
+            Icon(Icons.Default.Edit, "Edit", tint = textColor.copy(alpha = 0.5f), modifier = Modifier.size(18.dp))
+        }
+
+        if (onDelete != null) {
+            IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
+                Icon(Icons.Default.Delete, "Delete", tint = Color.Red.copy(alpha = 0.6f), modifier = Modifier.size(18.dp))
+            }
+        }
     }
 }
 
@@ -751,15 +897,13 @@ fun ModernTopBar(
 fun ModernDrawer(
     selectedFilter: EventType?,
     onFilterSelected: (EventType?) -> Unit,
-    currentTheme: AppTheme,
-    onThemeSelected: (AppTheme) -> Unit,
+    onSettingsClick: () -> Unit,
     onAboutClick: () -> Unit,
     accentColor: Color,
     textColor: Color,
     surfaceColor: Color,
     registry: EventTypeRegistry,
-    onEditBuiltIn: (BuiltInTypeState) -> Unit = {},
-    onEditCustom: (com.j4.eventify.components.EventTypeConfig) -> Unit = {}
+    hiddenTypes: Set<String>
 ) {
     ModalDrawerSheet(
         drawerContainerColor = surfaceColor,
@@ -771,12 +915,16 @@ fun ModernDrawer(
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            // ── THE FIX: The Logo acts as the secret "About" button ──
             Text(
                 "EVENTIFY",
                 fontSize   = 26.sp,
                 fontWeight = FontWeight.Black,
                 color      = accentColor,
-                modifier   = Modifier.padding(vertical = 12.dp)
+                modifier   = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable { onAboutClick() }
+                    .padding(vertical = 12.dp, horizontal = 4.dp)
             )
 
             HorizontalDivider(color = textColor.copy(alpha = 0.10f))
@@ -794,48 +942,42 @@ fun ModernDrawer(
 
             val builtIns = listOf(registry.academic, registry.personal, registry.occasion, registry.other)
             builtIns.forEach { state ->
-                val cfg = state.toConfig()
-                DrawerTypeItem(
-                    state       = state,
-                    config      = cfg,
-                    selected    = selectedFilter == state.type,
-                    textColor   = textColor,
-                    onClick     = { onFilterSelected(state.type) },
-                    onEditClick = { onEditBuiltIn(state) }
-                )
-            }
-
-            if (registry.customTypes.isNotEmpty()) {
-                HorizontalDivider(color = textColor.copy(alpha = 0.06f))
-                registry.customTypes.forEach { cfg ->
-                    DrawerCustomTypeItem(
-                        config      = cfg,
-                        selected    = selectedFilter == EventType.CUSTOM,
-                        textColor   = textColor,
-                        onClick     = { onFilterSelected(EventType.CUSTOM) },
-                        onEditClick = { onEditCustom(cfg) }
+                // Only render if the user hasn't unchecked it in Settings!
+                if (!hiddenTypes.contains(state.label)) {
+                    DrawerTypeItem(
+                        config    = state.toConfig(),
+                        selected  = selectedFilter == state.type,
+                        textColor = textColor,
+                        onClick   = { onFilterSelected(state.type) }
                     )
                 }
             }
 
+            if (registry.customTypes.isNotEmpty()) {
+                val visibleCustoms = registry.customTypes.filter { !hiddenTypes.contains(it.label) }
+                if (visibleCustoms.isNotEmpty()) {
+                    HorizontalDivider(color = textColor.copy(alpha = 0.06f))
+                    visibleCustoms.forEach { cfg ->
+                        DrawerTypeItem(
+                            config    = cfg,
+                            selected  = selectedFilter == EventType.CUSTOM,
+                            textColor = textColor,
+                            onClick   = { onFilterSelected(EventType.CUSTOM) }
+                        )
+                    }
+                }
+            }
+
             Spacer(modifier = Modifier.weight(1f))
-
             HorizontalDivider(color = textColor.copy(alpha = 0.10f))
 
-            ThemeSelector(
-                currentTheme    = currentTheme,
-                onThemeSelected = onThemeSelected,
-                textColor       = textColor
-            )
-
-            HorizontalDivider(color = textColor.copy(alpha = 0.10f))
-
+            // ── THE FIX: Added dedicated Settings Item ──
             ModernDrawerItem(
-                icon      = Icons.Default.Info,
-                text      = "About",
+                icon      = Icons.Default.Settings,
+                text      = "Settings",
                 selected  = false,
                 color     = Color.Gray,
-                onClick   = onAboutClick,
+                onClick   = onSettingsClick,
                 textColor = textColor
             )
         }
@@ -852,61 +994,44 @@ fun ThemeSelector(
     onThemeSelected: (AppTheme) -> Unit,
     textColor: Color
 ) {
-    Column(
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-        modifier            = Modifier.padding(horizontal = 4.dp)
+    Row(
+        modifier              = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment     = Alignment.CenterVertically
     ) {
-        Text(
-            "THEME",
-            fontSize      = 11.sp,
-            fontWeight    = FontWeight.Black,
-            color         = textColor.copy(alpha = 0.45f),
-            letterSpacing = 1.sp
+        ThemeCircle(
+            circleColor = Color(0xFFFFFFFF),
+            selected    = currentTheme == AppTheme.DEFAULT,
+            onClick     = { onThemeSelected(AppTheme.DEFAULT) },
+            iconVector  = Icons.Default.WbSunny,
+            iconTint    = Color(0xFFFFA000),
+            borderColor = Color(0xFFDDDDDD)
         )
-
-        Row(
-            modifier              = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment     = Alignment.CenterVertically
-        ) {
-            ThemeCircle(
-                circleColor = Color(0xFFFFFFFF),
-                selected    = currentTheme == AppTheme.DEFAULT,
-                onClick     = { onThemeSelected(AppTheme.DEFAULT) },
-                iconVector  = Icons.Default.WbSunny,
-                iconTint    = Color(0xFFFFA000),
-                borderColor = Color(0xFFDDDDDD)
-            )
-            ThemeCircle(
-                circleColor = Color(0xFFE91E63),
-                selected    = currentTheme == AppTheme.REDDISH_PINK,
-                onClick     = { onThemeSelected(AppTheme.REDDISH_PINK) }
-            )
-            ThemeCircle(
-                circleColor = Color(0xFFFF9800),
-                selected    = currentTheme == AppTheme.YELLOWISH,
-                onClick     = { onThemeSelected(AppTheme.YELLOWISH) }
-            )
-            ThemeCircle(
-                circleColor = Color(0xFF2196F3),
-                selected    = currentTheme == AppTheme.BLUEISH,
-                onClick     = { onThemeSelected(AppTheme.BLUEISH) }
-            )
-            ThemeCircle(
-                circleColor = Color(0xFF1A1A1A),
-                selected    = currentTheme == AppTheme.DARK,
-                onClick     = { onThemeSelected(AppTheme.DARK) },
-                iconVector  = Icons.Default.DarkMode,
-                iconTint    = Color.White,
-                borderColor = Color.Gray.copy(alpha = 0.25f)
-            )
-        }
+        ThemeCircle(
+            circleColor = Color(0xFFE91E63),
+            selected    = currentTheme == AppTheme.REDDISH_PINK,
+            onClick     = { onThemeSelected(AppTheme.REDDISH_PINK) }
+        )
+        ThemeCircle(
+            circleColor = Color(0xFFFF9800),
+            selected    = currentTheme == AppTheme.YELLOWISH,
+            onClick     = { onThemeSelected(AppTheme.YELLOWISH) }
+        )
+        ThemeCircle(
+            circleColor = Color(0xFF2196F3),
+            selected    = currentTheme == AppTheme.BLUEISH,
+            onClick     = { onThemeSelected(AppTheme.BLUEISH) }
+        )
+        ThemeCircle(
+            circleColor = Color(0xFF1A1A1A),
+            selected    = currentTheme == AppTheme.DARK,
+            onClick     = { onThemeSelected(AppTheme.DARK) },
+            iconVector  = Icons.Default.DarkMode,
+            iconTint    = Color.White,
+            borderColor = Color.Gray.copy(alpha = 0.25f)
+        )
     }
 }
-
-// ─────────────────────────────────────────────
-// Theme Circle
-// ─────────────────────────────────────────────
 
 @Composable
 fun ThemeCircle(
@@ -969,7 +1094,7 @@ fun ThemeCircle(
 }
 
 // ─────────────────────────────────────────────
-// Drawer Item
+// Drawer Items
 // ─────────────────────────────────────────────
 
 @Composable
@@ -999,6 +1124,52 @@ fun ModernDrawerItem(
                 fontSize   = 15.sp,
                 fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
                 color      = if (selected) textColor else Color.Gray
+            )
+        }
+    }
+}
+
+@Composable
+fun DrawerTypeItem(
+    config: com.j4.eventify.components.EventTypeConfig,
+    selected: Boolean,
+    textColor: Color,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        shape   = RoundedCornerShape(12.dp),
+        color   = if (selected) config.gradientStart.copy(alpha = 0.1f) else Color.Transparent
+    ) {
+        Row(
+            modifier              = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalAlignment     = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(22.dp)
+                    .clip(CircleShape)
+                    .background(
+                        androidx.compose.ui.graphics.Brush.linearGradient(
+                            listOf(config.gradientStart, config.gradientEnd)
+                        )
+                    )
+            )
+            Icon(
+                config.iconKey?.imageVector ?: Icons.Default.Star,
+                null,
+                tint     = if (selected) config.gradientStart else Color.Gray,
+                modifier = Modifier.size(20.dp)
+            )
+            Text(
+                config.label,
+                fontSize   = 15.sp,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                color      = if (selected) textColor else Color.Gray,
+                modifier   = Modifier.weight(1f)
             )
         }
     }
@@ -1216,119 +1387,4 @@ fun CustomTypeDialog(onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
             }
         }
     )
-}
-
-// ─────────────────────────────────────────────
-// Drawer Type Items
-// ─────────────────────────────────────────────
-
-@Composable
-fun DrawerTypeItem(
-    state: BuiltInTypeState,
-    config: com.j4.eventify.components.EventTypeConfig,
-    selected: Boolean,
-    textColor: Color,
-    onClick: () -> Unit,
-    onEditClick: () -> Unit
-) {
-    Surface(
-        onClick = onClick,
-        shape   = RoundedCornerShape(12.dp),
-        color   = if (selected) config.gradientStart.copy(alpha = 0.1f) else Color.Transparent
-    ) {
-        Row(
-            modifier              = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 10.dp),
-            verticalAlignment     = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(22.dp)
-                    .clip(CircleShape)
-                    .background(
-                        androidx.compose.ui.graphics.Brush.linearGradient(
-                            listOf(config.gradientStart, config.gradientEnd)
-                        )
-                    )
-            )
-            Icon(
-                state.iconKey.imageVector,
-                null,
-                tint     = if (selected) config.gradientStart else Color.Gray,
-                modifier = Modifier.size(20.dp)
-            )
-            Text(
-                state.label,
-                fontSize   = 15.sp,
-                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                color      = if (selected) textColor else Color.Gray,
-                modifier   = Modifier.weight(1f)
-            )
-            IconButton(onClick = onEditClick, modifier = Modifier.size(28.dp)) {
-                Icon(
-                    Icons.Default.Edit,
-                    "Edit type",
-                    tint     = Color.Gray.copy(alpha = 0.6f),
-                    modifier = Modifier.size(16.dp)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun DrawerCustomTypeItem(
-    config: com.j4.eventify.components.EventTypeConfig,
-    selected: Boolean,
-    textColor: Color,
-    onClick: () -> Unit,
-    onEditClick: () -> Unit = {}
-) {
-    Surface(
-        onClick = onClick,
-        shape   = RoundedCornerShape(12.dp),
-        color   = if (selected) config.gradientStart.copy(alpha = 0.1f) else Color.Transparent
-    ) {
-        Row(
-            modifier              = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 10.dp),
-            verticalAlignment     = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(22.dp)
-                    .clip(CircleShape)
-                    .background(
-                        androidx.compose.ui.graphics.Brush.linearGradient(
-                            listOf(config.gradientStart, config.gradientEnd)
-                        )
-                    )
-            )
-            Icon(
-                config.iconKey?.imageVector ?: Icons.Default.Star,
-                null,
-                tint     = if (selected) config.gradientStart else Color.Gray,
-                modifier = Modifier.size(20.dp)
-            )
-            Text(
-                config.label,
-                fontSize   = 15.sp,
-                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                color      = if (selected) textColor else Color.Gray,
-                modifier   = Modifier.weight(1f)
-            )
-            IconButton(onClick = onEditClick, modifier = Modifier.size(28.dp)) {
-                Icon(
-                    Icons.Default.Edit,
-                    "Edit type",
-                    tint     = Color.Gray.copy(alpha = 0.6f),
-                    modifier = Modifier.size(16.dp)
-                )
-            }
-        }
-    }
 }

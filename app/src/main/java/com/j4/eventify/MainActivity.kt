@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import com.j4.eventify.ui.theme.EventifyTheme
 
+
 /**
  * Main entry point of the Eventify app
  * Launches the navigation system

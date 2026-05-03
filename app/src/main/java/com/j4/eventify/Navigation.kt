@@ -1,10 +1,10 @@
 package com.j4.eventify
 
+import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -32,17 +32,25 @@ fun EventifyNavigation(
 ) {
     val navController = rememberNavController()
 
-    // 1. Grab the context
+    // 1. Grab the context and open the internal storage
     val context = androidx.compose.ui.platform.LocalContext.current
+    val prefs = remember { context.getSharedPreferences("eventify_settings", Context.MODE_PRIVATE) }
 
     // 2. We collect the live database flow here
     val entityList by viewModel.allEvents.collectAsState(initial = emptyList())
 
-    // rememberSaveable survives back-stack pops AND config changes.
-    var themeOrdinal by rememberSaveable { mutableStateOf(AppTheme.DEFAULT.ordinal) }
-    val currentTheme = AppTheme.entries[themeOrdinal]
+    // 3. Read the saved theme from disk (Defaults to 0 / DEFAULT if none exists)
+    val savedThemeOrdinal = prefs.getInt("app_theme_ordinal", AppTheme.DEFAULT.ordinal)
+    var themeOrdinal by remember { mutableStateOf(savedThemeOrdinal) }
 
-    // 3. THIS MUST BE THE ONLY REGISTRY LINE! (Delete any other 'val registry...' lines)
+    // Safely map the number back to the AppTheme enum
+    val currentTheme = try {
+        AppTheme.entries[themeOrdinal]
+    } catch (e: Exception) {
+        AppTheme.DEFAULT
+    }
+
+    // 4. Registry initialization
     val registry = remember { EventTypeRegistry(context) }
 
     NavHost(
@@ -53,7 +61,12 @@ fun EventifyNavigation(
         composable(route = Routes.HOME) {
             HomeScreen(
                 currentTheme             = currentTheme,
-                onThemeChange            = { themeOrdinal = it.ordinal },
+                onThemeChange            = { newTheme ->
+                    // Update the UI
+                    themeOrdinal = newTheme.ordinal
+                    // ── THE MAGIC: Save to the phone's hard drive! ──
+                    prefs.edit().putInt("app_theme_ordinal", newTheme.ordinal).apply()
+                },
                 registry                 = registry,
                 onNavigateToAddEvent     = { selectedDate, _ ->
                     val handle = navController.currentBackStackEntry?.savedStateHandle
@@ -89,7 +102,7 @@ fun EventifyNavigation(
         ) { backStackEntry ->
             val eventId = backStackEntry.arguments?.getInt("eventId") ?: 0
 
-            // Find the REAL event in the database, not DummyData
+            // Find the REAL event in the database
             val entity = entityList.find { it.id == eventId }
             val event = entity?.let { mapEntityToUiEvent(it) }
 
@@ -110,7 +123,7 @@ fun EventifyNavigation(
         ) { backStackEntry ->
             val eventId = backStackEntry.arguments?.getInt("eventId") ?: 0
 
-            // Find the REAL event in the database, not DummyData
+            // Find the REAL event in the database
             val entity = entityList.find { it.id == eventId }
             val event = entity?.let { mapEntityToUiEvent(it) }
 
@@ -120,7 +133,6 @@ fun EventifyNavigation(
                     onNavigateBack = { navController.popBackStack() },
                     onEdit         = { navController.navigate(Routes.editEvent(eventId)) },
                     onDelete       = {
-                        // MAGIC: We pass the real entity to the delete function!
                         entity?.let { viewModel.deleteEvent(it) }
                     },
                     registry       = registry
@@ -130,12 +142,6 @@ fun EventifyNavigation(
     }
 }
 
-// ─────────────────────────────────────────────
-// Database to UI Mapper Helper
-// ─────────────────────────────────────────────
-// ─────────────────────────────────────────────
-// Database to UI Mapper Helper
-// ─────────────────────────────────────────────
 // ─────────────────────────────────────────────
 // Database to UI Mapper Helper
 // ─────────────────────────────────────────────
