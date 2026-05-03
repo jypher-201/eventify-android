@@ -283,6 +283,8 @@ fun AddEventScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
+                // ── THE FIX: Dynamically shrinks the screen so the keyboard doesn't cover it ──
+                .imePadding()
                 .verticalScroll(rememberScrollState())
                 .graphicsLayer { this.alpha = alpha }
                 .padding(horizontal = 16.dp, vertical = 12.dp),
