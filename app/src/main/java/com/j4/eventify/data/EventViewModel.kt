@@ -53,44 +53,50 @@ class EventViewModel(private val repository: EventRepository) : ViewModel() {
     fun syncHolidaysFromApi(year: Int = 2026, countryCode: String = "PH") {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                // 1. Check if we already downloaded them to save data
-                // (Assuming you have a function in your repository to check this)
-                // val existingHolidays = repository.getEventsByTypeSync("HOLIDAY")
-                // if (existingHolidays.isNotEmpty()) return@launch
+                // 1. Check if we already downloaded them to prevent infinite duplicates!
+                // We just read the current flow value and check if any HOLIDAY exists
+                val currentEvents = allEvents.value
+                val alreadyHasHolidays = currentEvents.any { it.eventType == "HOLIDAY" }
+
+                if (alreadyHasHolidays) {
+                    return@launch // Stop right here, we already have them!
+                }
 
                 // 2. Call the internet API!
                 val apiHolidays = RetrofitClient.holidayApi.getHolidays(year, countryCode)
 
                 // 3. Setup our time tools
                 val manilaZone = TimeZone.getTimeZone("Asia/Manila")
-                val format = SimpleDateFormat("yyyy-MM-dd", Locale.US).apply { timeZone = manilaZone }
+                val format =
+                    SimpleDateFormat("yyyy-MM-dd", Locale.US).apply { timeZone = manilaZone }
 
                 // 4. Convert the Internet data into Database data and save it
                 apiHolidays.forEach { apiHoliday ->
                     val timestamp = format.parse(apiHoliday.date)?.time ?: return@forEach
 
                     val holidayEntity = EventEntity(
-                        title = apiHoliday.localName,
+                        // 1. CHANGE: Use englishName instead of localName
+                        title = apiHoliday.englishName,
                         description = "Philippine Holiday",
                         eventType = "HOLIDAY",
                         timestamp = timestamp,
-                        endTimestamp = timestamp + 86400000L, // Adds 24 hours for the end time
-                        locationName = null, // <--- Fixed!
-                        latitude = null,     // <--- Fixed!
-                        longitude = null,    // <--- Fixed!
-                        gradientIndex = 0,   // <--- Fixed!
-                        customLabel = null,  // <--- Fixed!
+                        endTimestamp = timestamp + 86400000L,
+                        locationName = null,
+                        latitude = null,
+                        longitude = null,
+                        gradientIndex = 0,
+                        customLabel = null,
                         isAllDay = true,
-                        repeatMode = "Every year",
+                        // 2. CHANGE: Stop it from jumping to 2027!
+                        repeatMode = "Does not repeat",
                         remindBeforeMinutes = emptyList()
                     )
 
-                    // Insert into your Room DB!
-                    // repository.insert(holidayEntity)
+                    // ── ACTUALLY INSERT IT! ──
+                    repository.insertEvent(holidayEntity)
                 }
             } catch (e: Exception) {
-                // The internet is down, or the API is broken.
-                // That's fine! We just fail silently and the app keeps working normally.
+                // Fails silently if no internet
                 e.printStackTrace()
             }
         }

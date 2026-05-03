@@ -228,9 +228,17 @@ class EventTypeRegistry(context: Context) {
             EventType.ACADEMIC -> academicConfig()
             EventType.PERSONAL -> personalConfig()
             EventType.OCCASION -> occasionConfig()
-            // ── THE FIX: Tell the 'when' block what to do with OTHER ──
             EventType.OTHER    -> otherConfig()
             EventType.CUSTOM   -> academicConfig() // Fallback
+            // ── ADD THIS HOLIDAY FALLBACK ──
+            EventType.HOLIDAY  -> EventTypeConfig(
+                type = EventType.HOLIDAY,
+                label = "Holidays",
+                gradientStart = androidx.compose.ui.graphics.Color(0xFF10B981),
+                gradientEnd = androidx.compose.ui.graphics.Color(0xFF059669),
+                textColor = androidx.compose.ui.graphics.Color.White,
+                badgeColor = androidx.compose.ui.graphics.Color(0xFF047857)
+            )
         }
     }
 }

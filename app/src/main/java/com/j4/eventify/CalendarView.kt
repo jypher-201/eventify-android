@@ -383,6 +383,7 @@ fun ModernDayCell(
                                 EventType.PERSONAL -> Color(0xFFf093fb)
                                 EventType.OCCASION -> Color(0xFFfcb69f)
                                 EventType.OTHER    -> Color(0xFF9E9E9E)
+                                EventType.HOLIDAY  -> Color(0xFF10B981) // ── FIX: Added Holiday Fallback Color ──
                                 EventType.CUSTOM   -> calEvent.event.customConfig?.gradientStart ?: accentColor
                             }
                         Box(

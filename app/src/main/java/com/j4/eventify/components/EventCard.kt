@@ -37,7 +37,9 @@ enum class EventType {
     OCCASION,
 
     OTHER,
-    CUSTOM      // user-defined types
+    CUSTOM,
+
+    HOLIDAY
 }
 
 // ─────────────────────────────────────────────

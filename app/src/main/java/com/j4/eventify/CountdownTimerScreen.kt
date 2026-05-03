@@ -81,6 +81,14 @@ fun CountdownTimerScreen(
         EventType.PERSONAL -> registry.personal.toConfig()
         EventType.OCCASION -> registry.occasion.toConfig()
         EventType.OTHER    -> registry.other.toConfig()
+        EventType.HOLIDAY -> com.j4.eventify.components.EventTypeConfig(
+            type = EventType.HOLIDAY,
+            label = "Holidays",
+            gradientStart = Color(0xFF10B981), // Emerald Green
+            gradientEnd = Color(0xFF059669),   // Darker Green
+            textColor = Color.White,
+            badgeColor = Color(0xFF047857)     // Deep Green
+        )
         EventType.CUSTOM -> {
             val liveCategory = registry.customTypes.find {
                 it.label.equals(event.customConfig?.label, ignoreCase = true)
