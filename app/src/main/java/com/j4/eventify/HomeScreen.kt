@@ -1,5 +1,6 @@
 package com.j4.eventify
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -199,6 +200,8 @@ fun HomeScreen(
     viewModel: EventViewModel = viewModel(factory = EventViewModelFactory),
     onNavigateToAddEvent: (String?, AppTheme) -> Unit = { _, _ -> },
     onNavigateToEventDetails: (Int) -> Unit = {},
+    // ── NEW: Pass this to your navigation graph to handle the edit swipe ──
+    onEditEvent: (Int) -> Unit = {},
     currentTheme: AppTheme = AppTheme.DEFAULT,
     onThemeChange: (AppTheme) -> Unit = {},
     registry: EventTypeRegistry
@@ -212,6 +215,8 @@ fun HomeScreen(
     var timeFilter           by remember { mutableStateOf(TimeFilter.ALL) }
     var showTimeFilterMenu   by remember { mutableStateOf(false) }
     var selectedCalendarDate by remember { mutableStateOf<String?>(null) }
+
+    var eventToDelete by remember { mutableStateOf<Event?>(null) }
 
     // Dialog States
     var showAboutDialog      by remember { mutableStateOf(false) }
@@ -319,6 +324,8 @@ fun HomeScreen(
 
     ModalNavigationDrawer(
         drawerState = drawerState,
+        // ── THE FIX: Only enable drawer gestures when it is already open! ──
+        gesturesEnabled = drawerState.isOpen,
         drawerContent = {
             ModernDrawer(
                 selectedFilter   = selectedFilter,
@@ -390,11 +397,20 @@ fun HomeScreen(
                                     verticalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     items(listFilteredAndSorted, key = { "${it.id}_${it.rawStartMs}" }) { event ->
-                                        EventCard(
-                                            event          = event,
-                                            onClick        = { onNavigateToEventDetails(event.id) },
-                                            overrideConfig = configResolver(event)
-                                        )
+                                        // ── FIX 2: Wrapped the EventCard in the Swipeable Tracker ──
+                                        SwipeableEventWrapper(
+                                            onEdit = { onEditEvent(event.id) },
+                                            onDelete = {
+                                                // ── THE FIX: Ask for confirmation instead of deleting instantly ──
+                                                eventToDelete = event
+                                            }
+                                        ) {
+                                            EventCard(
+                                                event          = event,
+                                                onClick        = { onNavigateToEventDetails(event.id) },
+                                                overrideConfig = configResolver(event)
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -525,6 +541,23 @@ fun HomeScreen(
             accentColor = accentColor
         )
     }
+
+    // ── NEW: Consistent Modern Delete Dialog ──
+    if (eventToDelete != null) {
+        ModernDeleteDialog(
+            eventTitle = eventToDelete?.title ?: "",
+            onConfirm = {
+                val entity = entityList.find { it.id == eventToDelete?.id }
+                if (entity != null) {
+                    viewModel.deleteEvent(entity)
+                }
+                eventToDelete = null // Close the dialog
+            },
+            onDismiss = { eventToDelete = null }
+        )
+    }
+
+
 }
 
 // ─────────────────────────────────────────────
@@ -1388,6 +1421,81 @@ fun ModernAboutDialog(
                     fontSize   = 15.sp
                 )
             }
+        }
+    )
+}
+
+// ─────────────────────────────────────────────
+// NEW: Swipeable Event Wrapper
+// ─────────────────────────────────────────────
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SwipeableEventWrapper(
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+    content: @Composable () -> Unit
+) {
+    val dismissState = rememberSwipeToDismissBoxState(
+        confirmValueChange = { dismissValue ->
+            when (dismissValue) {
+                SwipeToDismissBoxValue.StartToEnd -> {
+                    onEdit()
+                    false // Return false so the card snaps back after opening the Edit screen
+                }
+                SwipeToDismissBoxValue.EndToStart -> {
+                    onDelete()
+                    // Return false so it snaps back while asking for confirmation ──
+                    false
+                }
+                else -> false
+            }
+        }
+    )
+
+    SwipeToDismissBox(
+        state = dismissState,
+        backgroundContent = {
+            val direction = dismissState.dismissDirection
+
+            // Smoothly animate the background color based on the swipe direction
+            val color by animateColorAsState(
+                targetValue = when (dismissState.targetValue) {
+                    SwipeToDismissBoxValue.StartToEnd -> Color(0xFF10B981) // Emerald Green for Edit
+                    SwipeToDismissBoxValue.EndToStart -> Color(0xFFEF4444) // Red for Delete
+                    else -> Color.Transparent
+                },
+                label = "swipe_color"
+            )
+
+            val alignment = when (direction) {
+                SwipeToDismissBoxValue.StartToEnd -> Alignment.CenterStart
+                SwipeToDismissBoxValue.EndToStart -> Alignment.CenterEnd
+                else -> Alignment.Center
+            }
+
+            val icon = when (direction) {
+                SwipeToDismissBoxValue.StartToEnd -> Icons.Default.Edit
+                SwipeToDismissBoxValue.EndToStart -> Icons.Default.Delete
+                else -> Icons.Default.Circle
+            }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(vertical = 4.dp) // Ensures spacing doesn't overlap
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(color)
+                    .padding(horizontal = 24.dp),
+                contentAlignment = alignment
+            ) {
+                if (direction != SwipeToDismissBoxValue.Settled) {
+                    Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(28.dp))
+                }
+            }
+        },
+        content = {
+            content()
         }
     )
 }
