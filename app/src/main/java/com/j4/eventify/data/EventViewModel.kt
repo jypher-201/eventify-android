@@ -16,6 +16,7 @@ import com.j4.eventify.data.remote.RetrofitClient
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.TimeZone
+import kotlinx.coroutines.flow.first
 
 class EventViewModel(private val repository: EventRepository) : ViewModel() {
 
@@ -53,13 +54,11 @@ class EventViewModel(private val repository: EventRepository) : ViewModel() {
     fun syncHolidaysFromApi(year: Int = 2026, countryCode: String = "PH") {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                // 1. Check if we already downloaded them to prevent infinite duplicates!
-                // We just read the current flow value and check if any HOLIDAY exists
-                val currentEvents = allEvents.value
+                val currentEvents = repository.allEvents.first()
                 val alreadyHasHolidays = currentEvents.any { it.eventType == "HOLIDAY" }
 
                 if (alreadyHasHolidays) {
-                    return@launch // Stop right here, we already have them!
+                    return@launch // Stop right here, we really do have them!
                 }
 
                 // 2. Call the internet API!
