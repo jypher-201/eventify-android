@@ -72,4 +72,7 @@ dependencies {
 
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+
+    // For getting the device's current GPS location
+    implementation("com.google.android.gms:play-services-location:21.2.0")
 }

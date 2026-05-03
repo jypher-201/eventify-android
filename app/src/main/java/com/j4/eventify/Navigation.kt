@@ -221,6 +221,10 @@ fun mapEntityToUiEvent(entity: com.j4.eventify.data.local.EventEntity): com.j4.e
         rawEndMs = entity.endTimestamp,
         isAllDay = entity.isAllDay,
         remindBeforeMinutes = entity.remindBeforeMinutes,
-        repeatMode = entity.repeatMode
+        repeatMode = entity.repeatMode,
+
+        locationName = entity.locationName,
+        latitude = entity.latitude,
+        longitude = entity.longitude
     )
 }

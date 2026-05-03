@@ -490,6 +490,17 @@ fun CountdownTimerScreen(
                     content   = config.label,
                     textColor = textColor
                 )
+
+                // ── ADD THIS NEW LOCATION CARD ──
+                if (!event.locationName.isNullOrBlank()) {
+                    ModernInfoCard(
+                        icon      = Icons.Default.LocationOn,
+                        title     = "Location",
+                        content   = event.locationName,
+                        textColor = textColor
+                    )
+                }
+
                 if (event.notes.isNotEmpty()) {
                     ModernInfoCard(
                         icon      = Icons.AutoMirrored.Filled.Notes,

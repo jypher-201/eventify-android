@@ -182,7 +182,9 @@ fun AddEventScreen(
     var showNotifPicker  by remember { mutableStateOf(false) }
     var showCustomDialog by remember { mutableStateOf(false) }
 
-    var location by remember { mutableStateOf("") }
+    var locationName by remember { mutableStateOf(prefilledEvent?.locationName ?: "") }
+    var locationLat  by remember { mutableStateOf(prefilledEvent?.latitude) }
+    var locationLon  by remember { mutableStateOf(prefilledEvent?.longitude) }
 
     var repeatOption by remember { mutableStateOf(prefilledEvent?.repeatMode ?: "Does not repeat") }
     var showRepeatPicker by remember { mutableStateOf(false) }
@@ -255,9 +257,9 @@ fun AddEventScreen(
                             eventType = selectedType.name,
                             timestamp = startTimestamp,
                             endTimestamp = endTimestamp,
-                            locationName = location.trim().ifEmpty { null },
-                            latitude = null,
-                            longitude = null,
+                            locationName = locationName.trim().ifEmpty { null },
+                            latitude = locationLat,
+                            longitude = locationLon,
                             remindBeforeMinutes = remindMinutesList,
                             gradientIndex = chosenGradient,
                             customLabel = selectedCustomCfg?.label,
@@ -355,12 +357,15 @@ fun AddEventScreen(
                 isDark        = isDark
             )
 
-            LocationCard(
-                location      = location,
-                onValueChange = { location = it },
-                accent        = accent,
-                surfColor     = surfColor,
-                textColor     = textColor
+            com.j4.eventify.components.LocationPicker(
+                currentLocationName = locationName,
+                onLocationSelected  = { name, lat, lon ->
+                    locationName = name
+                    locationLat  = lat
+                    locationLon  = lon
+                },
+                accentColor = accent,
+                textColor   = textColor
             )
 
             RepeatCard(
@@ -1312,39 +1317,6 @@ fun ThemedTimePickerDialog(
     )
 }
 
-// ─────────────────────────────────────────────
-// Location Card
-// ─────────────────────────────────────────────
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun LocationCard(
-    location: String, onValueChange: (String) -> Unit,
-    accent: Color, surfColor: Color, textColor: Color
-) {
-    Surface(shape = RoundedCornerShape(13.dp), color = surfColor, shadowElevation = 2.dp, modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier              = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-            verticalAlignment     = Alignment.CenterVertically
-        ) {
-            Icon(Icons.Default.LocationOn, null, tint = accent, modifier = Modifier.size(22.dp))
-            TextField(
-                value         = location,
-                onValueChange = onValueChange,
-                placeholder   = { Text("Add location", color = textColor.copy(alpha = 0.38f), fontSize = 16.sp) },
-                colors        = TextFieldDefaults.colors(
-                    focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent,
-                    focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent,
-                    cursorColor = accent, unfocusedTextColor = textColor, focusedTextColor = textColor
-                ),
-                modifier  = Modifier.fillMaxWidth(),
-                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 16.sp, color = textColor),
-                singleLine = true
-            )
-        }
-    }
-}
 
 // ─────────────────────────────────────────────
 // Repeat Card

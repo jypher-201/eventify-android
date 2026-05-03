@@ -136,7 +136,11 @@ data class Event(
     val rawEndMs: Long? = null,
     val isAllDay: Boolean = false,
     val remindBeforeMinutes: List<Int> = emptyList(),
-    val repeatMode: String? = null
+    val repeatMode: String? = null,
+
+    val locationName: String? = null,
+    val latitude: Double? = null,
+    val longitude: Double? = null
 )
 
 // Resolve the config to use for rendering
