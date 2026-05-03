@@ -75,6 +75,10 @@ fun EventifyNavigation(
                 },
                 onNavigateToEventDetails = { eventId ->
                     navController.navigate(Routes.eventDetails(eventId))
+                },
+                // ── THE FIX: Wire the swipe gesture to your Edit Route! ──
+                onEditEvent = { eventId ->
+                    navController.navigate(Routes.editEvent(eventId))
                 }
             )
         }
