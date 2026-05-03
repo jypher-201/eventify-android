@@ -250,8 +250,8 @@ fun HomeScreen(
                                             EventType.ACADEMIC -> registry.academic.toConfig()
                                             EventType.PERSONAL -> registry.personal.toConfig()
                                             EventType.OCCASION -> registry.occasion.toConfig()
+                                            EventType.OTHER    -> registry.other.toConfig()
                                             EventType.CUSTOM -> {
-                                                // ── THE FIX: Ignore uppercase/lowercase when matching! ──
                                                 val liveCategory = registry.customTypes.find {
                                                     it.label.equals(event.customConfig?.label, ignoreCase = true)
                                                 }
@@ -282,8 +282,8 @@ fun HomeScreen(
                                             EventType.ACADEMIC -> registry.academic.toConfig()
                                             EventType.PERSONAL -> registry.personal.toConfig()
                                             EventType.OCCASION -> registry.occasion.toConfig()
+                                            EventType.OTHER    -> registry.other.toConfig()
                                             EventType.CUSTOM -> {
-                                                // ── THE FIX AGAIN! ──
                                                 val liveCategory = registry.customTypes.find {
                                                     it.label.equals(event.customConfig?.label, ignoreCase = true)
                                                 }
@@ -332,12 +332,36 @@ fun HomeScreen(
     editingCustom?.let { cfg ->
         val currentIndex = com.j4.eventify.components.gradientPalette.indexOfFirst { it.first == cfg.gradientStart }.coerceAtLeast(0)
 
+        // Count how many events are using this exact category!
+        val linkedEvents = realEvents.filter {
+            it.type == EventType.CUSTOM && it.customConfig?.label.equals(cfg.label, ignoreCase = true)
+        }
+
         EditTypeDialog(
-            initialLabel    = cfg.label,
-            initialGradient = currentIndex,
-            initialIconKey  = cfg.iconKey ?: BuiltInIcon.STAR, // ── THE FIX: Load the saved icon!
-            showDelete      = true,                            // ── THE FIX: Turn on the Delete button!
-            onDelete        = {                                // ── THE FIX: Make it delete the category!
+            initialLabel         = cfg.label,
+            initialGradient      = currentIndex,
+            initialIconKey       = cfg.iconKey ?: BuiltInIcon.STAR,
+            showDelete           = true,
+            associatedEventCount = linkedEvents.size, // Pass the count to the dialog!
+            onDelete = { moveToOther -> // <--- Captures the new boolean!
+                linkedEvents.forEach { eventToMove ->
+                    val entity = entityList.find { it.id == eventToMove.id }
+                    if (entity != null) {
+                        if (moveToOther) {
+                            // IF CHECKED: Move to 'Other' safely!
+                            val safeEntity = entity.copy(
+                                eventType = EventType.OTHER.name,
+                                customLabel = null
+                            )
+                            viewModel.updateEvent(safeEntity)
+                        } else {
+                            // IF UNCHECKED: Nuke the event!
+                            viewModel.deleteEvent(entity)
+                        }
+                    }
+                }
+
+                // Destroy the empty custom category
                 registry.removeCustomType(cfg)
                 editingCustom = null
             },
@@ -352,7 +376,7 @@ fun HomeScreen(
                     gradientEnd   = pair.second,
                     textColor     = com.j4.eventify.components.textColorForGradient(pair.first),
                     badgeColor    = com.j4.eventify.components.badgeColorForGradient(pair.first, pair.second),
-                    iconKey       = result.iconKey             // ── THE FIX: Save the new icon!
+                    iconKey       = result.iconKey
                 )
                 registry.updateCustomType(cfg, updated)
                 editingCustom = null
@@ -673,14 +697,16 @@ fun ModernDrawer(
                 textColor = textColor
             )
 
-            listOf(registry.academic, registry.personal, registry.occasion).forEach { state ->
+            // ── THE FIX: The loop here is properly formatted now ──
+            val builtIns = listOf(registry.academic, registry.personal, registry.occasion, registry.other)
+            builtIns.forEach { state ->
                 val cfg = state.toConfig()
                 DrawerTypeItem(
-                    state     = state,
-                    config    = cfg,
-                    selected  = selectedFilter == state.type,
-                    textColor = textColor,
-                    onClick   = { onFilterSelected(state.type) },
+                    state       = state,
+                    config      = cfg,
+                    selected    = selectedFilter == state.type,
+                    textColor   = textColor,
+                    onClick     = { onFilterSelected(state.type) },
                     onEditClick = { onEditBuiltIn(state) }
                 )
             }
@@ -689,10 +715,10 @@ fun ModernDrawer(
                 HorizontalDivider(color = textColor.copy(alpha = 0.06f))
                 registry.customTypes.forEach { cfg ->
                     DrawerCustomTypeItem(
-                        config    = cfg,
-                        selected  = selectedFilter == EventType.CUSTOM,
-                        textColor = textColor,
-                        onClick   = { onFilterSelected(EventType.CUSTOM) },
+                        config      = cfg,
+                        selected    = selectedFilter == EventType.CUSTOM,
+                        textColor   = textColor,
+                        onClick     = { onFilterSelected(EventType.CUSTOM) },
                         onEditClick = { onEditCustom(cfg) }
                     )
                 }

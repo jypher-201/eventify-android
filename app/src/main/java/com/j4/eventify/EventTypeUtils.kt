@@ -11,6 +11,7 @@ fun getEventTypeColor(type: EventType): Color {
         EventType.ACADEMIC -> AcademicBlue
         EventType.PERSONAL -> PersonalPink
         EventType.OCCASION -> OccasionYellow
+        EventType.OTHER    -> Color(0xFF9E9E9E)
         EventType.CUSTOM   -> Color(0xFF667eea)
     }
 }

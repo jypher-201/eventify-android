@@ -6,6 +6,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import kotlinx.coroutines.flow.Flow
+import androidx.room.Update
 
 @Dao
 interface EventDao {
@@ -23,4 +24,7 @@ interface EventDao {
     // RETURNS List<Long>: The IDs of all inserted holidays
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertHolidays(holidays: List<EventEntity>): List<Long>
+
+    @Update
+    suspend fun updateEvent(event: EventEntity)
 }

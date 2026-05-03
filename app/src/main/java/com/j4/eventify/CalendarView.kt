@@ -335,6 +335,7 @@ fun ModernDayCell(
                                 EventType.ACADEMIC -> Color(0xFF667eea)
                                 EventType.PERSONAL -> Color(0xFFf093fb)
                                 EventType.OCCASION -> Color(0xFFfcb69f)
+                                EventType.OTHER    -> Color(0xFF9E9E9E)
                                 EventType.CUSTOM   -> calEvent.event.customConfig?.gradientStart ?: accentColor
                             }
                         Box(

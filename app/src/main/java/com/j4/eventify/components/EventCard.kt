@@ -35,6 +35,8 @@ enum class EventType {
     ACADEMIC,
     PERSONAL,
     OCCASION,
+
+    OTHER,
     CUSTOM      // user-defined types
 }
 

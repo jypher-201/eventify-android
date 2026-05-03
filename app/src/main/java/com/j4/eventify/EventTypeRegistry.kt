@@ -133,6 +133,15 @@ class EventTypeRegistry(context: Context) {
         )
     )
 
+    var other by mutableStateOf(
+        BuiltInTypeState(
+            EventType.OTHER,
+            prefs.getString("OTHER_label", "Other") ?: "Other",
+            try { BuiltInIcon.valueOf(prefs.getString("OTHER_icon", "BOOK") ?: "BOOK") } catch(e: Exception) { BuiltInIcon.BOOK },
+            prefs.getInt("OTHER_gradient", 3) // Uses a different default color!
+        )
+    )
+
     var customTypes by mutableStateOf(loadCustomTypes())
         private set
 
@@ -141,6 +150,7 @@ class EventTypeRegistry(context: Context) {
             EventType.ACADEMIC -> academic = state
             EventType.PERSONAL -> personal = state
             EventType.OCCASION -> occasion = state
+            EventType.OTHER    -> other = state
             else -> return
         }
         prefs.edit()
@@ -206,8 +216,11 @@ class EventTypeRegistry(context: Context) {
     fun academicConfig() = academic.toConfig()
     fun personalConfig() = personal.toConfig()
     fun occasionConfig() = occasion.toConfig()
+    // ── THE FIX: Add a helper for the new OTHER category ──
+    fun otherConfig()    = other.toConfig()
 
-    fun allConfigs(): List<EventTypeConfig> = listOf(academicConfig(), personalConfig(), occasionConfig()) + customTypes
+    // Update this list so OTHER appears in any generated lists
+    fun allConfigs(): List<EventTypeConfig> = listOf(academicConfig(), personalConfig(), occasionConfig(), otherConfig()) + customTypes
 
     fun resolveForType(type: EventType, customConfig: EventTypeConfig?): EventTypeConfig {
         if (customConfig != null) return customConfig
@@ -215,7 +228,9 @@ class EventTypeRegistry(context: Context) {
             EventType.ACADEMIC -> academicConfig()
             EventType.PERSONAL -> personalConfig()
             EventType.OCCASION -> occasionConfig()
-            EventType.CUSTOM   -> academicConfig()
+            // ── THE FIX: Tell the 'when' block what to do with OTHER ──
+            EventType.OTHER    -> otherConfig()
+            EventType.CUSTOM   -> academicConfig() // Fallback
         }
     }
 }

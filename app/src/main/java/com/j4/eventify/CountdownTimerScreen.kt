@@ -78,6 +78,7 @@ fun CountdownTimerScreen(
         EventType.ACADEMIC -> registry.academic.toConfig()
         EventType.PERSONAL -> registry.personal.toConfig()
         EventType.OCCASION -> registry.occasion.toConfig()
+        EventType.OTHER    -> registry.other.toConfig()
         EventType.CUSTOM -> {
             val liveCategory = registry.customTypes.find {
                 it.label.equals(event.customConfig?.label, ignoreCase = true)
