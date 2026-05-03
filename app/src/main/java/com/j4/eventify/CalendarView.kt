@@ -30,8 +30,7 @@ import java.util.Calendar
 // Data
 // ─────────────────────────────────────────────
 
-// Cached once at class-load time — TimeZone.getTimeZone() does a disk read
-// and is expensive to call repeatedly.
+// Cached once at class-load time
 private val philippinesZone: java.util.TimeZone =
     java.util.TimeZone.getTimeZone("Asia/Manila")
 
@@ -42,20 +41,66 @@ data class CalendarEvent(
     val year: Int
 )
 
-fun mapEventsToDays(events: List<Event>): List<CalendarEvent> {
-    // Base calendar created once; each event clones it to avoid repeated getInstance() calls
-    val base = Calendar.getInstance(philippinesZone)
-    return events.mapNotNull { event ->
-        val daysFromNow = event.countdownNumber.toIntOrNull() ?: return@mapNotNull null
-        val eventCal = base.clone() as Calendar
-        eventCal.add(Calendar.DAY_OF_MONTH, daysFromNow)
-        CalendarEvent(
-            event = event,
-            day   = eventCal.get(Calendar.DAY_OF_MONTH),
-            month = eventCal.get(Calendar.MONTH),
-            year  = eventCal.get(Calendar.YEAR)
-        )
+// ── THE FIX: The Time Machine! Only generates events for the year the user is looking at. ──
+fun mapEventsToDays(events: List<Event>, targetYear: Int): List<CalendarEvent> {
+    val results = mutableListOf<CalendarEvent>()
+    val cal = Calendar.getInstance(philippinesZone)
+
+    events.forEach { event ->
+        // Start at the exact millisecond the event originally began
+        cal.timeInMillis = event.rawStartMs
+        val originalYear = cal.get(Calendar.YEAR)
+
+        if (event.repeatMode.isNullOrBlank() || event.repeatMode == "Does not repeat") {
+            // Single event: Just add it as-is
+            results.add(
+                CalendarEvent(
+                    event = event,
+                    day   = cal.get(Calendar.DAY_OF_MONTH),
+                    month = cal.get(Calendar.MONTH),
+                    year  = originalYear
+                )
+            )
+        } else {
+            // Repeating Event: We need to time travel!
+            val lower = event.repeatMode.lowercase()
+            val parts = lower.split(" ")
+            val amount = parts.getOrNull(1)?.toIntOrNull() ?: 1
+
+            // Smart translation for jumping forward in time safely
+            val unit = when {
+                lower.contains("day") -> Calendar.DAY_OF_YEAR
+                lower.contains("week") -> Calendar.DAY_OF_YEAR // We use days for weeks to avoid end-of-year bugs
+                lower.contains("month") -> Calendar.MONTH
+                lower.contains("year") -> Calendar.YEAR
+                else -> Calendar.DAY_OF_YEAR
+            }
+
+            // If they said "Every 2 weeks", we jump 14 days at a time
+            val addAmount = if (lower.contains("week")) amount * 7 else amount
+
+            // Fast forward through time until we jump past the year the user is viewing
+            while (cal.get(Calendar.YEAR) <= targetYear) {
+                val currentLoopYear = cal.get(Calendar.YEAR)
+
+                // Only save the ghost if it happens in the Target Year OR its Original Creation Year
+                if (currentLoopYear == targetYear || currentLoopYear == originalYear) {
+                    results.add(
+                        CalendarEvent(
+                            event = event,
+                            day   = cal.get(Calendar.DAY_OF_MONTH),
+                            month = cal.get(Calendar.MONTH),
+                            year  = currentLoopYear
+                        )
+                    )
+                }
+                // Time travel forward!
+                cal.add(unit, addAmount)
+            }
+        }
     }
+    // Remove any accidental duplicates and return
+    return results.distinct()
 }
 
 // ─────────────────────────────────────────────
@@ -73,7 +118,6 @@ fun CalendarView(
     surfaceColor: Color = Color.White,
     configResolver: ((Event) -> com.j4.eventify.components.EventTypeConfig)? = null
 ) {
-    // Uses the top-level cached philippinesZone — no disk read here
     val today = Calendar.getInstance(philippinesZone)
 
     val todayDay   = today.get(Calendar.DAY_OF_MONTH)
@@ -84,7 +128,10 @@ fun CalendarView(
     var currentYear  by remember { mutableIntStateOf(todayYear) }
     var selectedDay  by remember { mutableIntStateOf(todayDay) }
 
-    val calendarEvents   = remember(events) { mapEventsToDays(events) }
+    // ── THE FIX: The calendar recalculates the ghosts dynamically whenever you change the year! ──
+    val calendarEvents = remember(events, currentYear) {
+        mapEventsToDays(events, currentYear)
+    }
 
     val selectedDayEvents = calendarEvents.filter {
         it.day   == selectedDay  &&
@@ -101,7 +148,7 @@ fun CalendarView(
         onDateSelected("${monthNames[currentMonth]} $selectedDay, $currentYear")
     }
 
-    // Background uses the theme's background color (dark on DARK, light otherwise)
+    // Background uses the theme's background color
     val listBg = if (textColor == Color.White) Color(0xFF1A1A1A) else Color(0xFFFAFAFA)
 
     Column(
@@ -270,7 +317,7 @@ fun CalendarView(
 }
 
 // ─────────────────────────────────────────────
-// Day Cell  (single overload — fully dynamic)
+// Day Cell
 // ─────────────────────────────────────────────
 
 @Composable

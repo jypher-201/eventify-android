@@ -27,6 +27,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.ui.graphics.SolidColor
+import com.j4.eventify.components.Event
 import com.j4.eventify.components.EventCard
 import com.j4.eventify.components.EventType
 import com.j4.eventify.ui.theme.*
@@ -37,6 +38,8 @@ import com.j4.eventify.data.EventViewModelFactory
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.Calendar
+import java.util.TimeZone
 import java.util.concurrent.TimeUnit
 
 // ─────────────────────────────────────────────
@@ -85,7 +88,6 @@ fun getSurfaceColor(theme: AppTheme): Color = when (theme) {
     else          -> Color(0xFFFFFFFF)
 }
 
-// Top bar background: light pastel tint per theme
 fun getTopBarColor(theme: AppTheme): Color = when (theme) {
     AppTheme.DEFAULT      -> Color(0xFFFFFFFF)
     AppTheme.REDDISH_PINK -> Color(0xFFFFE4EE)
@@ -94,10 +96,99 @@ fun getTopBarColor(theme: AppTheme): Color = when (theme) {
     AppTheme.DARK         -> Color(0xFF2A2A2A)
 }
 
-// Icon / text colour on the top bar — dark on light bars, white on dark
 fun getTopBarContentColor(theme: AppTheme): Color = when (theme) {
     AppTheme.DARK -> Color(0xFFFFFFFF)
     else          -> Color(0xFF1A1A1A)
+}
+
+// ─────────────────────────────────────────────
+// The List View Time Machine!
+// ─────────────────────────────────────────────
+fun expandEventsForCurrentYear(baseEvents: List<Event>): List<Event> {
+    val results = mutableListOf<Event>()
+    val manilaZone = TimeZone.getTimeZone("Asia/Manila")
+    val cal = Calendar.getInstance(manilaZone)
+    val currentYear = cal.get(Calendar.YEAR)
+
+    // Baseline today at midnight to calculate accurate "Days From Now" for the ghosts
+    val todayMidnight = Calendar.getInstance(manilaZone).apply {
+        set(Calendar.HOUR_OF_DAY, 0)
+        set(Calendar.MINUTE, 0)
+        set(Calendar.SECOND, 0)
+        set(Calendar.MILLISECOND, 0)
+    }.timeInMillis
+
+    val dateFormat = SimpleDateFormat("MMM dd, yyyy", Locale.US)
+    val timeFormat = SimpleDateFormat("h:mm a", Locale.US)
+
+    baseEvents.forEach { event ->
+        if (event.repeatMode.isNullOrBlank() || event.repeatMode == "Does not repeat") {
+            results.add(event)
+            return@forEach
+        }
+
+        cal.timeInMillis = event.rawStartMs
+        val durationMs = (event.rawEndMs ?: event.rawStartMs) - event.rawStartMs
+
+        val lower = event.repeatMode.lowercase()
+        val parts = lower.split(" ")
+        val amount = parts.getOrNull(1)?.toIntOrNull() ?: 1
+
+        // Smart week math
+        val unit = when {
+            lower.contains("day") -> Calendar.DAY_OF_YEAR
+            lower.contains("week") -> Calendar.DAY_OF_YEAR
+            lower.contains("month") -> Calendar.MONTH
+            lower.contains("year") -> Calendar.YEAR
+            else -> Calendar.DAY_OF_YEAR
+        }
+        val addAmount = if (lower.contains("week")) amount * 7 else amount
+
+        // Generate copies only when the loop reaches the current calendar year
+        while (cal.get(Calendar.YEAR) <= currentYear) {
+            val loopYear = cal.get(Calendar.YEAR)
+            if (loopYear == currentYear) {
+                val ghostStart = cal.timeInMillis
+                val ghostEnd = ghostStart + durationMs
+
+                val ghostMidnight = Calendar.getInstance(manilaZone).apply {
+                    timeInMillis = ghostStart
+                    set(Calendar.HOUR_OF_DAY, 0)
+                    set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 0)
+                    set(Calendar.MILLISECOND, 0)
+                }.timeInMillis
+
+                val daysFromNow = TimeUnit.MILLISECONDS.toDays(ghostMidnight - todayMidnight).toInt()
+
+                val startDateStr = dateFormat.format(Date(ghostStart))
+                val endDateStr = dateFormat.format(Date(ghostEnd))
+                val startTimeStr = if (event.isAllDay) "12:00 AM" else timeFormat.format(Date(ghostStart))
+                val endTimeStr = if (event.isAllDay) "12:00 AM" else timeFormat.format(Date(ghostEnd))
+
+                val dateTimeString = if (event.isAllDay) {
+                    if (startDateStr == endDateStr) startDateStr else "$startDateStr to $endDateStr"
+                } else {
+                    if (startDateStr == endDateStr) {
+                        "$startDateStr at $startTimeStr to $endTimeStr"
+                    } else {
+                        "$startDateStr at $startTimeStr to $endDateStr at $endTimeStr"
+                    }
+                }
+
+                results.add(
+                    event.copy(
+                        rawStartMs = ghostStart,
+                        rawEndMs = ghostEnd,
+                        dateTime = dateTimeString,
+                        countdownNumber = daysFromNow.toString()
+                    )
+                )
+            }
+            cal.add(unit, addAmount)
+        }
+    }
+    return results
 }
 
 // ─────────────────────────────────────────────
@@ -136,38 +227,41 @@ fun HomeScreen(
     val topBarColor        = getTopBarColor(currentTheme)
     val topBarContentColor = getTopBarContentColor(currentTheme)
 
-    // 1. COLLECT THE REAL DATABASE FLOW
+    // 1. FETCH FROM DB
     val entityList by viewModel.allEvents.collectAsState(initial = emptyList())
 
-    // 2. CONVERT ENTITIES TO UI EVENTS ON THE FLY
-    val realEvents = remember(entityList) {
-        entityList.map { entity ->
-            mapEntityToUiEvent(entity)
-        }
+    // 2. CREATE BASE UI EVENTS (1 per Database Row)
+    val baseEvents = remember(entityList) {
+        entityList.map { mapEntityToUiEvent(it) }
     }
 
-    // 3. FILTERING LOGIC USING THE REAL EVENTS
-    val filteredAndSortedEvents = remember(selectedFilter, searchQuery, timeFilter, realEvents) {
-        val filtered = if (selectedFilter != null)
-            realEvents.filter { it.type == selectedFilter }
-        else
-            realEvents
-
-        val searched = if (searchQuery.isNotBlank())
-            filtered.filter {
+    // 3. APPLY GLOBAL FILTERS (Search & Category)
+    val baseFilteredEvents = remember(selectedFilter, searchQuery, baseEvents) {
+        var result = baseEvents
+        if (selectedFilter != null) result = result.filter { it.type == selectedFilter }
+        if (searchQuery.isNotBlank()) {
+            result = result.filter {
                 it.title.contains(searchQuery, ignoreCase = true) ||
                         it.notes.contains(searchQuery, ignoreCase = true)
             }
-        else filtered
-
-        val timeFiltered = when (timeFilter) {
-            TimeFilter.ALL        -> searched
-            TimeFilter.TODAY      -> searched.filter { (it.countdownNumber.toIntOrNull() ?: 999) == 0 }
-            TimeFilter.TOMORROW   -> searched.filter { (it.countdownNumber.toIntOrNull() ?: 999) == 1 }
-            TimeFilter.THIS_WEEK  -> searched.filter { (it.countdownNumber.toIntOrNull() ?: 999) in 0..7 }
-            TimeFilter.THIS_MONTH -> searched.filter { (it.countdownNumber.toIntOrNull() ?: 999) in 0..30 }
         }
+        result
+    }
 
+    // 4. GENERATE CURRENT-YEAR GHOSTS FOR LIST VIEW
+    val listViewEvents = remember(baseFilteredEvents) {
+        expandEventsForCurrentYear(baseFilteredEvents)
+    }
+
+    // 5. APPLY TIME FILTERS TO LIST VIEW GHOSTS
+    val listFilteredAndSorted = remember(timeFilter, listViewEvents) {
+        val timeFiltered = when (timeFilter) {
+            TimeFilter.ALL        -> listViewEvents
+            TimeFilter.TODAY      -> listViewEvents.filter { (it.countdownNumber.toIntOrNull() ?: 999) == 0 }
+            TimeFilter.TOMORROW   -> listViewEvents.filter { (it.countdownNumber.toIntOrNull() ?: 999) == 1 }
+            TimeFilter.THIS_WEEK  -> listViewEvents.filter { (it.countdownNumber.toIntOrNull() ?: 999) in 0..7 }
+            TimeFilter.THIS_MONTH -> listViewEvents.filter { (it.countdownNumber.toIntOrNull() ?: 999) in 0..30 }
+        }
         timeFiltered.sortedBy { it.countdownNumber.toIntOrNull() ?: 999 }
     }
 
@@ -231,7 +325,10 @@ fun HomeScreen(
                         .fillMaxSize()
                         .padding(paddingValues)
                 ) {
-                    if (filteredAndSortedEvents.isEmpty()) {
+                    // Check if current view is empty based on its unique list!
+                    val isCurrentViewEmpty = if (viewMode == ViewMode.LIST) listFilteredAndSorted.isEmpty() else baseFilteredEvents.isEmpty()
+
+                    if (isCurrentViewEmpty) {
                         ModernEmptyState(
                             message   = if (searchQuery.isNotBlank()) "No events found for \"$searchQuery\"" else "No events found",
                             textColor = textColor
@@ -244,7 +341,8 @@ fun HomeScreen(
                                     contentPadding      = PaddingValues(16.dp),
                                     verticalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    items(filteredAndSortedEvents, key = { it.id }) { event ->
+                                    // Make keys unique to prevent crash on identical ghost clones
+                                    items(listFilteredAndSorted, key = { "${it.id}_${it.rawStartMs}" }) { event ->
 
                                         val latestConfig = when (event.type) {
                                             EventType.ACADEMIC -> registry.academic.toConfig()
@@ -261,7 +359,7 @@ fun HomeScreen(
 
                                         EventCard(
                                             event          = event,
-                                            onClick        = { onNavigateToEventDetails(event.id) },
+                                            onClick        = { onNavigateToEventDetails(event.id) }, // Pass original DB ID
                                             overrideConfig = latestConfig
                                         )
 
@@ -269,8 +367,9 @@ fun HomeScreen(
                                 }
                             }
                             ViewMode.CALENDAR -> {
+                                // Feed the pure Base Events to the Calendar so it can handle infinite scrolling!
                                 CalendarView(
-                                    events          = filteredAndSortedEvents,
+                                    events          = baseFilteredEvents,
                                     onEventClick    = onNavigateToEventDetails,
                                     onDateSelected  = { selectedCalendarDate = it },
                                     modifier        = Modifier.fillMaxSize(),
@@ -332,8 +431,8 @@ fun HomeScreen(
     editingCustom?.let { cfg ->
         val currentIndex = com.j4.eventify.components.gradientPalette.indexOfFirst { it.first == cfg.gradientStart }.coerceAtLeast(0)
 
-        // Count how many events are using this exact category!
-        val linkedEvents = realEvents.filter {
+        // Read from the Base events so the event count is perfectly accurate!
+        val linkedEvents = baseEvents.filter {
             it.type == EventType.CUSTOM && it.customConfig?.label.equals(cfg.label, ignoreCase = true)
         }
 
@@ -342,26 +441,22 @@ fun HomeScreen(
             initialGradient      = currentIndex,
             initialIconKey       = cfg.iconKey ?: BuiltInIcon.STAR,
             showDelete           = true,
-            associatedEventCount = linkedEvents.size, // Pass the count to the dialog!
-            onDelete = { moveToOther -> // <--- Captures the new boolean!
+            associatedEventCount = linkedEvents.size,
+            onDelete = { moveToOther ->
                 linkedEvents.forEach { eventToMove ->
                     val entity = entityList.find { it.id == eventToMove.id }
                     if (entity != null) {
                         if (moveToOther) {
-                            // IF CHECKED: Move to 'Other' safely!
                             val safeEntity = entity.copy(
                                 eventType = EventType.OTHER.name,
                                 customLabel = null
                             )
                             viewModel.updateEvent(safeEntity)
                         } else {
-                            // IF UNCHECKED: Nuke the event!
                             viewModel.deleteEvent(entity)
                         }
                     }
                 }
-
-                // Destroy the empty custom category
                 registry.removeCustomType(cfg)
                 editingCustom = null
             },
@@ -697,7 +792,6 @@ fun ModernDrawer(
                 textColor = textColor
             )
 
-            // ── THE FIX: The loop here is properly formatted now ──
             val builtIns = listOf(registry.academic, registry.personal, registry.occasion, registry.other)
             builtIns.forEach { state ->
                 val cfg = state.toConfig()
@@ -1159,15 +1253,12 @@ fun DrawerTypeItem(
                         )
                     )
             )
-
-            // ── THE FIX: Read the icon from the state! ──
             Icon(
                 state.iconKey.imageVector,
                 null,
                 tint     = if (selected) config.gradientStart else Color.Gray,
                 modifier = Modifier.size(20.dp)
             )
-
             Text(
                 state.label,
                 fontSize   = 15.sp,
@@ -1175,7 +1266,6 @@ fun DrawerTypeItem(
                 color      = if (selected) textColor else Color.Gray,
                 modifier   = Modifier.weight(1f)
             )
-
             IconButton(onClick = onEditClick, modifier = Modifier.size(28.dp)) {
                 Icon(
                     Icons.Default.Edit,
@@ -1218,15 +1308,12 @@ fun DrawerCustomTypeItem(
                         )
                     )
             )
-
-            // ── THE FIX: Read the iconKey from the config, fallback to Star! ──
             Icon(
                 config.iconKey?.imageVector ?: Icons.Default.Star,
                 null,
                 tint     = if (selected) config.gradientStart else Color.Gray,
                 modifier = Modifier.size(20.dp)
             )
-
             Text(
                 config.label,
                 fontSize   = 15.sp,
