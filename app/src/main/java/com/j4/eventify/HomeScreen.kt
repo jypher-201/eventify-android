@@ -1,5 +1,6 @@
 package com.j4.eventify
 
+import android.content.Context
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
@@ -19,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -200,7 +202,6 @@ fun HomeScreen(
     viewModel: EventViewModel = viewModel(factory = EventViewModelFactory),
     onNavigateToAddEvent: (String?, AppTheme) -> Unit = { _, _ -> },
     onNavigateToEventDetails: (Int) -> Unit = {},
-    // ── NEW: Pass this to your navigation graph to handle the edit swipe ──
     onEditEvent: (Int) -> Unit = {},
     currentTheme: AppTheme = AppTheme.DEFAULT,
     onThemeChange: (AppTheme) -> Unit = {},
@@ -208,6 +209,9 @@ fun HomeScreen(
 ) {
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+
+    val prefs = remember { context.getSharedPreferences("eventify_settings", Context.MODE_PRIVATE) }
 
     var selectedFilter       by remember { mutableStateOf<EventType?>(null) }
     var searchQuery          by remember { mutableStateOf("") }
@@ -224,7 +228,10 @@ fun HomeScreen(
     var showCustomTypeDialog by remember { mutableStateOf(false) }
 
     // Settings States
-    var hiddenTypes          by remember { mutableStateOf(setOf<String>()) }
+    var hiddenTypes by remember {
+        mutableStateOf(prefs.getStringSet("hidden_types", emptySet())?.toSet() ?: emptySet())
+    }
+
     var editingBuiltIn       by remember { mutableStateOf<BuiltInTypeState?>(null) }
     var editingCustom        by remember { mutableStateOf<com.j4.eventify.components.EventTypeConfig?>(null) }
 
@@ -235,8 +242,8 @@ fun HomeScreen(
     val topBarColor        = getTopBarColor(currentTheme)
     val topBarContentColor = getTopBarContentColor(currentTheme)
 
-    // ── TRIGGER HOLIDAY API FETCH ON START ──
     LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(1200)
         val currentYear = Calendar.getInstance().get(Calendar.YEAR)
         viewModel.syncHolidaysFromApi(currentYear, "PH")
     }
@@ -249,10 +256,9 @@ fun HomeScreen(
         entityList.map { mapEntityToUiEvent(it) }
     }
 
-    // 3. APPLY GLOBAL FILTERS (Hidden Settings, Search & Category)
+    // 3. APPLY GLOBAL FILTERS
     val baseFilteredEvents = remember(selectedFilter, searchQuery, hiddenTypes, baseEvents) {
         baseEvents.filter { event ->
-            // A. Check if the user hid this category in Settings
             val label = when (event.type.name) {
                 "ACADEMIC" -> registry.academic.label
                 "PERSONAL" -> registry.personal.label
@@ -264,17 +270,15 @@ fun HomeScreen(
             }
             if (hiddenTypes.contains(label)) return@filter false
 
-            // B. Check the Navigation Drawer Filter
             if (selectedFilter != null && event.type != selectedFilter) return@filter false
 
-            // C. Check the Top Bar Search
             if (searchQuery.isNotBlank()) {
                 val matchesTitle = event.title.contains(searchQuery, ignoreCase = true)
                 val matchesNotes = event.notes.contains(searchQuery, ignoreCase = true)
                 if (!matchesTitle && !matchesNotes) return@filter false
             }
 
-            true // If it survived all 3 checks, it renders!
+            true
         }
     }
 
@@ -284,12 +288,10 @@ fun HomeScreen(
     }
 
     // 5. APPLY TIME FILTERS & SMART SORTING TO LIST VIEW GHOSTS
-    // 5. APPLY TIME FILTERS & SMART SORTING TO LIST VIEW GHOSTS
     val listFilteredAndSorted = remember(timeFilter, listViewEvents) {
         val now = System.currentTimeMillis()
 
         val calNow = Calendar.getInstance().apply {
-            // ── THE FIX: Force the calendar to group Monday-Sunday as ONE week! ──
             firstDayOfWeek = Calendar.MONDAY
         }
         val currentYear = calNow.get(Calendar.YEAR)
@@ -301,12 +303,10 @@ fun HomeScreen(
         val tomorrowYear = calNow.get(Calendar.YEAR)
         val tomorrowDayOfYear = calNow.get(Calendar.DAY_OF_YEAR)
 
-        // ── STEP 1: The Fix for Time Filters (Using True Calendar Boundaries) ──
         val timeFiltered = listViewEvents.filter { event ->
             if (timeFilter == TimeFilter.ALL) return@filter true
 
             val calEvent = Calendar.getInstance().apply {
-                // ── Match the same Monday-Sunday rule for the event! ──
                 firstDayOfWeek = Calendar.MONDAY
                 timeInMillis = event.rawStartMs
             }
@@ -324,38 +324,25 @@ fun HomeScreen(
             }
         }
 
-        // ── STEP 2: The 3-Tier Smart Sort ──
+        // ── STEP 2: The 2-Tier Smart Sort (Future at top, Passed at bottom) ──
         timeFiltered.sortedWith(
             compareBy<Event> { event ->
                 val fallbackDuration = if (event.isAllDay) 86400000L else 3600000L
                 val endTime = event.rawEndMs ?: (event.rawStartMs + fallbackDuration)
 
-                val calEvent = Calendar.getInstance().apply { timeInMillis = event.rawStartMs }
-                val isToday = (currentYear == calEvent.get(Calendar.YEAR) && currentDayOfYear == calEvent.get(Calendar.DAY_OF_YEAR))
-                val isPassed = endTime < now
-
-                // Bucket 0 = Today (Absolute Top VIPs)
-                // Bucket 1 = Upcoming (Middle)
-                // Bucket 2 = Passed (Bottom)
-                when {
-                    isToday -> 0
-                    !isPassed -> 1
-                    else -> 2
-                }
+                // Bucket 0 = Upcoming/Ongoing (Top)
+                // Bucket 1 = Passed/Finished (Bottom)
+                if (endTime >= now) 0 else 1
 
             }.thenBy { event ->
                 val fallbackDuration = if (event.isAllDay) 86400000L else 3600000L
                 val endTime = event.rawEndMs ?: (event.rawStartMs + fallbackDuration)
 
-                val calEvent = Calendar.getInstance().apply { timeInMillis = event.rawStartMs }
-                val isToday = (currentYear == calEvent.get(Calendar.YEAR) && currentDayOfYear == calEvent.get(Calendar.DAY_OF_YEAR))
-                val isPassed = endTime < now
-
-                if (isToday || !isPassed) {
-                    // Sort Today and Upcoming ascending (Morning first, Next day first)
+                if (endTime >= now) {
+                    // Sort Upcoming ascending (Soonest first, morning before night)
                     event.rawStartMs
                 } else {
-                    // Sort Past events descending (Yesterday comes before Last Week)
+                    // Sort Passed descending (Most recently missed at the top of the bottom pile)
                     -event.rawStartMs
                 }
             }
@@ -366,32 +353,33 @@ fun HomeScreen(
             searchQuery.isNotBlank() ||
             timeFilter != TimeFilter.ALL
 
-    // Configuration map for Cards & Calendar Dots
-    val configResolver: (Event) -> EventTypeConfig = { event ->
-        when (event.type.name) {
-            "ACADEMIC" -> registry.academic.toConfig()
-            "PERSONAL" -> registry.personal.toConfig()
-            "OCCASION" -> registry.occasion.toConfig()
-            "OTHER"    -> registry.other.toConfig()
-            "HOLIDAY"  -> EventTypeConfig(
-                type = EventType.HOLIDAY,
-                label = "Holidays",
-                gradientStart = Color(0xFF10B981), // Emerald Green
-                gradientEnd = Color(0xFF059669),
-                textColor = Color.White,
-                badgeColor = Color(0xFF047857)
-            )
-            "CUSTOM" -> {
-                val liveCategory = registry.customTypes.find { it.label.equals(event.customConfig?.label, ignoreCase = true) }
-                liveCategory ?: event.customConfig ?: registry.academic.toConfig()
+    // ── THE FIX 1: Wrap configResolver in "remember" so it doesn't cause scrolling lag! ──
+    val configResolver = remember(registry) {
+        { event: Event ->
+            when (event.type.name) {
+                "ACADEMIC" -> registry.academic.toConfig()
+                "PERSONAL" -> registry.personal.toConfig()
+                "OCCASION" -> registry.occasion.toConfig()
+                "OTHER"    -> registry.other.toConfig()
+                "HOLIDAY"  -> EventTypeConfig(
+                    type = EventType.HOLIDAY,
+                    label = "Holidays",
+                    gradientStart = Color(0xFF10B981), // Emerald Green
+                    gradientEnd = Color(0xFF059669),
+                    textColor = Color.White,
+                    badgeColor = Color(0xFF047857)
+                )
+                "CUSTOM" -> {
+                    val liveCategory = registry.customTypes.find { it.label.equals(event.customConfig?.label, ignoreCase = true) }
+                    liveCategory ?: event.customConfig ?: registry.academic.toConfig()
+                }
+                else -> registry.other.toConfig()
             }
-            else -> registry.other.toConfig()
         }
     }
 
     ModalNavigationDrawer(
         drawerState = drawerState,
-        // ── THE FIX: Only enable drawer gestures when it is already open! ──
         gesturesEnabled = drawerState.isOpen,
         drawerContent = {
             ModernDrawer(
@@ -464,11 +452,9 @@ fun HomeScreen(
                                     verticalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     items(listFilteredAndSorted, key = { "${it.id}_${it.rawStartMs}" }) { event ->
-                                        // ── FIX 2: Wrapped the EventCard in the Swipeable Tracker ──
                                         SwipeableEventWrapper(
                                             onEdit = { onEditEvent(event.id) },
                                             onDelete = {
-                                                // ── THE FIX: Ask for confirmation instead of deleting instantly ──
                                                 eventToDelete = event
                                             }
                                         ) {
@@ -519,7 +505,11 @@ fun HomeScreen(
             registry = registry,
             hiddenTypes = hiddenTypes,
             onToggleVisibility = { label, isVisible ->
-                hiddenTypes = if (isVisible) hiddenTypes - label else hiddenTypes + label
+                val newHidden = if (isVisible) hiddenTypes - label else hiddenTypes + label
+                hiddenTypes = newHidden
+
+                // ── THE FIX: Force Android to save by using a raw HashSet ──
+                prefs.edit().putStringSet("hidden_types", java.util.HashSet(newHidden)).apply()
             },
             onEditBuiltIn = { editingBuiltIn = it },
             onEditCustom = { editingCustom = it },
@@ -609,7 +599,6 @@ fun HomeScreen(
         )
     }
 
-    // ── NEW: Consistent Modern Delete Dialog ──
     if (eventToDelete != null) {
         ModernDeleteDialog(
             eventTitle = eventToDelete?.title ?: "",
@@ -618,17 +607,15 @@ fun HomeScreen(
                 if (entity != null) {
                     viewModel.deleteEvent(entity)
                 }
-                eventToDelete = null // Close the dialog
+                eventToDelete = null
             },
             onDismiss = { eventToDelete = null }
         )
     }
-
-
 }
 
 // ─────────────────────────────────────────────
-// NEW Settings Dialog & Rows
+// Settings Dialog & Rows
 // ─────────────────────────────────────────────
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -1085,12 +1072,10 @@ fun ModernDrawer(
                 textColor = textColor
             )
 
-            // ── Drawer Holidays Item ──
             if (!hiddenTypes.contains("Holidays")) {
                 Surface(
                     onClick = { onFilterSelected(EventType.HOLIDAY) },
                     shape   = RoundedCornerShape(12.dp),
-                    // Change the hover color
                     color   = if (selectedFilter == EventType.HOLIDAY) Color(0xFF10B981).copy(alpha = 0.1f) else Color.Transparent
                 ) {
                     Row(
@@ -1101,7 +1086,6 @@ fun ModernDrawer(
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Box(
-                            // Change the circle color
                             modifier = Modifier.size(22.dp).clip(CircleShape).background(Color(0xFF10B981)),
                             contentAlignment = Alignment.Center
                         ) {
@@ -1118,7 +1102,6 @@ fun ModernDrawer(
                 }
             }
 
-            // Drawer Built-ins
             val builtIns = listOf(registry.academic, registry.personal, registry.occasion, registry.other)
             builtIns.forEach { state ->
                 if (!hiddenTypes.contains(state.label)) {
@@ -1131,7 +1114,6 @@ fun ModernDrawer(
                 }
             }
 
-            // Drawer Custom Types
             if (registry.customTypes.isNotEmpty()) {
                 val visibleCustoms = registry.customTypes.filter { !hiddenTypes.contains(it.label) }
                 if (visibleCustoms.isNotEmpty()) {
@@ -1508,16 +1490,17 @@ fun SwipeableEventWrapper(
             when (dismissValue) {
                 SwipeToDismissBoxValue.StartToEnd -> {
                     onEdit()
-                    false // Return false so the card snaps back after opening the Edit screen
+                    false
                 }
                 SwipeToDismissBoxValue.EndToStart -> {
                     onDelete()
-                    // Return false so it snaps back while asking for confirmation ──
                     false
                 }
                 else -> false
             }
-        }
+        },
+        // ── THE FIX 2: Require a deliberate, 50% screen swipe to trigger! ──
+        positionalThreshold = { distance: Float -> distance * 0.5f }
     )
 
     SwipeToDismissBox(
@@ -1525,7 +1508,6 @@ fun SwipeableEventWrapper(
         backgroundContent = {
             val direction = dismissState.dismissDirection
 
-            // Smoothly animate the background color based on the swipe direction
             val color by animateColorAsState(
                 targetValue = when (dismissState.targetValue) {
                     SwipeToDismissBoxValue.StartToEnd -> Color(0xFF10B981) // Emerald Green for Edit
@@ -1550,7 +1532,7 @@ fun SwipeableEventWrapper(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(vertical = 4.dp) // Ensures spacing doesn't overlap
+                    .padding(vertical = 4.dp)
                     .clip(RoundedCornerShape(16.dp))
                     .background(color)
                     .padding(horizontal = 24.dp),
