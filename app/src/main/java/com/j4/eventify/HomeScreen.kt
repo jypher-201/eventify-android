@@ -211,7 +211,6 @@ fun HomeScreen(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
-
     val prefs = remember { context.getSharedPreferences("eventify_settings", Context.MODE_PRIVATE) }
 
     var selectedFilter       by remember { mutableStateOf<EventType?>(null) }
@@ -226,7 +225,6 @@ fun HomeScreen(
     // Dialog States
     var showAboutDialog      by remember { mutableStateOf(false) }
     var showSettingsDialog   by remember { mutableStateOf(false) }
-    var showCustomTypeDialog by remember { mutableStateOf(false) }
 
     // Settings States
     var hiddenTypes by remember {
@@ -257,8 +255,8 @@ fun HomeScreen(
         entityList.map { mapEntityToUiEvent(it) }
     }
 
-    // 3. APPLY GLOBAL FILTERS
-    val baseFilteredEvents = remember(selectedFilter, searchQuery, hiddenTypes, baseEvents) {
+    // 3A. LIST VIEW FILTER (Respects all hidden toggles including Holidays)
+    val listFilteredEvents = remember(selectedFilter, searchQuery, hiddenTypes, baseEvents) {
         baseEvents.filter { event ->
             val label = when (event.type.name) {
                 "ACADEMIC" -> registry.academic.label
@@ -269,23 +267,46 @@ fun HomeScreen(
                 "CUSTOM"   -> event.customConfig?.label ?: "CUSTOM"
                 else       -> "OTHER"
             }
+
             if (hiddenTypes.contains(label)) return@filter false
-
             if (selectedFilter != null && event.type != selectedFilter) return@filter false
-
             if (searchQuery.isNotBlank()) {
                 val matchesTitle = event.title.contains(searchQuery, ignoreCase = true)
                 val matchesNotes = event.notes.contains(searchQuery, ignoreCase = true)
                 if (!matchesTitle && !matchesNotes) return@filter false
             }
+            true
+        }
+    }
 
+    // 3B. CALENDAR VIEW FILTER (Always shows Holidays)
+    val calendarFilteredEvents = remember(selectedFilter, searchQuery, hiddenTypes, baseEvents) {
+        baseEvents.filter { event ->
+            val label = when (event.type.name) {
+                "ACADEMIC" -> registry.academic.label
+                "PERSONAL" -> registry.personal.label
+                "OCCASION" -> registry.occasion.label
+                "OTHER"    -> registry.other.label
+                "HOLIDAY"  -> "Holidays"
+                "CUSTOM"   -> event.customConfig?.label ?: "CUSTOM"
+                else       -> "OTHER"
+            }
+
+            // Ignores the hiddenTypes rule if it's a Holiday!
+            if (label != "Holidays" && hiddenTypes.contains(label)) return@filter false
+            if (selectedFilter != null && event.type != selectedFilter) return@filter false
+            if (searchQuery.isNotBlank()) {
+                val matchesTitle = event.title.contains(searchQuery, ignoreCase = true)
+                val matchesNotes = event.notes.contains(searchQuery, ignoreCase = true)
+                if (!matchesTitle && !matchesNotes) return@filter false
+            }
             true
         }
     }
 
     // 4. GENERATE CURRENT-YEAR GHOSTS FOR LIST VIEW
-    val listViewEvents = remember(baseFilteredEvents) {
-        expandEventsForCurrentYear(baseFilteredEvents)
+    val listViewEvents = remember(listFilteredEvents) {
+        expandEventsForCurrentYear(listFilteredEvents)
     }
 
     // 5. APPLY TIME FILTERS & SMART SORTING TO LIST VIEW GHOSTS
@@ -325,14 +346,11 @@ fun HomeScreen(
             }
         }
 
-        // ── STEP 2: The 2-Tier Smart Sort (Future at top, Passed at bottom) ──
+        // 2-Tier Smart Sort
         timeFiltered.sortedWith(
             compareBy<Event> { event ->
                 val fallbackDuration = if (event.isAllDay) 86400000L else 3600000L
                 val endTime = event.rawEndMs ?: (event.rawStartMs + fallbackDuration)
-
-                // Bucket 0 = Upcoming/Ongoing (Top)
-                // Bucket 1 = Passed/Finished (Bottom)
                 if (endTime >= now) 0 else 1
 
             }.thenBy { event ->
@@ -340,10 +358,8 @@ fun HomeScreen(
                 val endTime = event.rawEndMs ?: (event.rawStartMs + fallbackDuration)
 
                 if (endTime >= now) {
-                    // Sort Upcoming ascending (Soonest first, morning before night)
                     event.rawStartMs
                 } else {
-                    // Sort Passed descending (Most recently missed at the top of the bottom pile)
                     -event.rawStartMs
                 }
             }
@@ -354,7 +370,6 @@ fun HomeScreen(
             searchQuery.isNotBlank() ||
             timeFilter != TimeFilter.ALL
 
-    // ── THE FIX 1: Wrap configResolver in "remember" so it doesn't cause scrolling lag! ──
     val configResolver = remember(registry) {
         { event: Event ->
             when (event.type.name) {
@@ -365,7 +380,7 @@ fun HomeScreen(
                 "HOLIDAY"  -> EventTypeConfig(
                     type = EventType.HOLIDAY,
                     label = "Holidays",
-                    gradientStart = Color(0xFF10B981), // Emerald Green
+                    gradientStart = Color(0xFF10B981),
                     gradientEnd = Color(0xFF059669),
                     textColor = Color.White,
                     badgeColor = Color(0xFF047857)
@@ -437,7 +452,7 @@ fun HomeScreen(
                         .fillMaxSize()
                         .padding(paddingValues)
                 ) {
-                    val isCurrentViewEmpty = if (viewMode == ViewMode.LIST) listFilteredAndSorted.isEmpty() else baseFilteredEvents.isEmpty()
+                    val isCurrentViewEmpty = if (viewMode == ViewMode.LIST) listFilteredAndSorted.isEmpty() else calendarFilteredEvents.isEmpty()
 
                     if (isCurrentViewEmpty) {
                         ModernEmptyState(
@@ -454,7 +469,6 @@ fun HomeScreen(
                                 ) {
                                     items(listFilteredAndSorted, key = { "${it.id}_${it.rawStartMs}" }) { event ->
                                         SwipeableEventWrapper(
-                                            // ── THE FIX: Add a smooth animation modifier instead of the laggy sensor! ──
                                             modifier = Modifier.animateItem(),
                                             onEdit = { onEditEvent(event.id) },
                                             onDelete = { eventToDelete = event }
@@ -470,7 +484,7 @@ fun HomeScreen(
                             }
                             ViewMode.CALENDAR -> {
                                 CalendarView(
-                                    events          = baseFilteredEvents,
+                                    events          = calendarFilteredEvents,
                                     onEventClick    = onNavigateToEventDetails,
                                     onDateSelected  = { selectedCalendarDate = it },
                                     modifier        = Modifier.fillMaxSize(),
@@ -508,8 +522,6 @@ fun HomeScreen(
             onToggleVisibility = { label, isVisible ->
                 val newHidden = if (isVisible) hiddenTypes - label else hiddenTypes + label
                 hiddenTypes = newHidden
-
-                // ── THE FIX: Force Android to save by using a raw HashSet ──
                 prefs.edit().putStringSet("hidden_types", java.util.HashSet(newHidden)).apply()
             },
             onEditBuiltIn = { editingBuiltIn = it },
@@ -675,7 +687,7 @@ fun SettingsDialog(
                         icon = Icons.Default.Celebration,
                         isVisible = !hiddenTypes.contains("Holidays"),
                         onVisibilityChange = { isVisible -> onToggleVisibility("Holidays", isVisible) },
-                        onEdit = null, // Can't edit the system holiday pipeline
+                        onEdit = null,
                         onDelete = null,
                         textColor = textColor,
                         accentColor = accentColor
@@ -692,7 +704,7 @@ fun SettingsDialog(
                         isVisible = !hiddenTypes.contains(state.label),
                         onVisibilityChange = { isVisible -> onToggleVisibility(state.label, isVisible) },
                         onEdit = { onEditBuiltIn(state) },
-                        onDelete = null, // Built-ins cannot be deleted!
+                        onDelete = null,
                         textColor = textColor,
                         accentColor = accentColor
                     )
@@ -710,7 +722,7 @@ fun SettingsDialog(
                             isVisible = !hiddenTypes.contains(cfg.label),
                             onVisibilityChange = { isVisible -> onToggleVisibility(cfg.label, isVisible) },
                             onEdit = { onEditCustom(cfg) },
-                            onDelete = { onDeleteCustom(cfg) }, // Custom types get the delete button
+                            onDelete = { onDeleteCustom(cfg) },
                             textColor = textColor,
                             accentColor = accentColor
                         )
@@ -765,7 +777,7 @@ fun SettingsCategoryRow(
                 Icon(Icons.Default.Edit, "Edit", tint = textColor.copy(alpha = 0.5f), modifier = Modifier.size(18.dp))
             }
         } else {
-            Spacer(modifier = Modifier.width(32.dp)) // Maintain alignment if no edit button
+            Spacer(modifier = Modifier.width(32.dp))
         }
 
         if (onDelete != null) {
@@ -1482,7 +1494,7 @@ fun ModernAboutDialog(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SwipeableEventWrapper(
-    modifier: Modifier = Modifier, // ── ADD MODIFIER ──
+    modifier: Modifier = Modifier,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     content: @Composable () -> Unit
@@ -1501,14 +1513,12 @@ fun SwipeableEventWrapper(
                 else -> false
             }
         },
-        // ── THE FIX: Force the user to swipe at least 60% of the screen.
-        // This makes it virtually impossible to trigger accidentally while scrolling! ──
         positionalThreshold = { distance: Float -> distance * 0.60f }
     )
 
     SwipeToDismissBox(
         state = dismissState,
-        modifier = modifier, // ── APPLY MODIFIER HERE ──
+        modifier = modifier,
         backgroundContent = {
             val direction = dismissState.dismissDirection
 
@@ -1521,7 +1531,6 @@ fun SwipeableEventWrapper(
                 label = "swipe_color"
             )
 
-            // Optional polish: Make the icons scale up smoothly as you drag!
             val scale by animateFloatAsState(
                 targetValue = if (dismissState.targetValue == SwipeToDismissBoxValue.Settled) 0.7f else 1f,
                 animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
@@ -1554,7 +1563,6 @@ fun SwipeableEventWrapper(
                         icon,
                         contentDescription = null,
                         tint = Color.White,
-                        // ── THE FIX 2: Apply the smooth scale animation ──
                         modifier = Modifier.size(28.dp).graphicsLayer { scaleX = scale; scaleY = scale }
                     )
                 }

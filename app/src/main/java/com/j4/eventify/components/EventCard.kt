@@ -160,7 +160,6 @@ fun EventCard(
     event: Event,
     modifier: Modifier = Modifier,
     onClick: () -> Unit = {},
-    // Pass registry.resolveForType(...) here to get live color updates
     overrideConfig: EventTypeConfig? = null
 ) {
     val config = overrideConfig ?: remember(event) { event.resolvedConfig() }
@@ -188,6 +187,18 @@ fun EventCard(
         ),
         label = "shadow_elevation"
     )
+
+    // ── NEW: Calculate the exact state of the event! ──
+    val now = System.currentTimeMillis()
+    val fallbackDuration = if (event.isAllDay) 86400000L else 3600000L
+    val endTime = event.rawEndMs ?: (event.rawStartMs + fallbackDuration)
+
+    val isPassed = endTime < now
+
+    val calNow = java.util.Calendar.getInstance()
+    val calEvent = java.util.Calendar.getInstance().apply { timeInMillis = event.rawStartMs }
+    val isToday = calNow.get(java.util.Calendar.YEAR) == calEvent.get(java.util.Calendar.YEAR) &&
+            calNow.get(java.util.Calendar.DAY_OF_YEAR) == calEvent.get(java.util.Calendar.DAY_OF_YEAR)
 
     Box(
         modifier = modifier
@@ -258,7 +269,7 @@ fun EventCard(
                                     .padding(horizontal = 9.dp, vertical = 5.dp)
                             ) {
                                 Text(
-                                    text          = config.label.uppercase(), // <--- Force it to UPPERCASE here!
+                                    text          = config.label.uppercase(),
                                     fontSize      = 10.sp,
                                     fontWeight    = FontWeight.Black,
                                     color         = config.badgeColor,
@@ -280,11 +291,11 @@ fun EventCard(
                             )
                             Text(
                                 text       = event.dateTime.replace(" (All Day)", ""),
-                                fontSize   = 12.sp, // <--- Shrink slightly from 13.sp to 12.sp
+                                fontSize   = 12.sp,
                                 fontWeight = FontWeight.Medium,
                                 color      = config.textColor.copy(alpha = 0.8f),
-                                maxLines   = 2, // <--- CHANGE THIS to 2
-                                lineHeight = 16.sp, // <--- ADD THIS so it looks clean when stacked
+                                maxLines   = 2,
+                                lineHeight = 16.sp,
                                 overflow   = TextOverflow.Ellipsis
                             )
                         }
@@ -306,23 +317,44 @@ fun EventCard(
                             verticalArrangement = Arrangement.Center,
                             modifier            = Modifier.fillMaxSize()
                         ) {
-                            Text(
-                                text       = event.countdownNumber,
-                                fontSize   = 26.sp,
-                                fontWeight = FontWeight.Black,
-                                color      = config.textColor,
-                                lineHeight = 26.sp,
-                                textAlign  = TextAlign.Center
-                            )
-                            Spacer(Modifier.height(1.dp))
-                            Text(
-                                text          = event.countdownLabel,
-                                fontSize      = 9.sp,
-                                fontWeight    = FontWeight.Bold,
-                                color         = config.textColor.copy(alpha = 0.8f),
-                                letterSpacing = 0.4.sp,
-                                textAlign     = TextAlign.Center
-                            )
+                            // ── THE FIX: Smart UI Logic for the Bubble! ──
+                            if (isPassed) {
+                                Text(
+                                    text       = "DONE",
+                                    fontSize   = 15.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color      = config.textColor,
+                                    textAlign  = TextAlign.Center,
+                                    letterSpacing = 0.5.sp
+                                )
+                            } else if (isToday) {
+                                Text(
+                                    text       = "TODAY",
+                                    fontSize   = 13.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color      = config.textColor,
+                                    textAlign  = TextAlign.Center,
+                                    letterSpacing = 0.5.sp
+                                )
+                            } else {
+                                Text(
+                                    text       = event.countdownNumber,
+                                    fontSize   = 22.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color      = config.textColor,
+                                    lineHeight = 22.sp,
+                                    textAlign  = TextAlign.Center
+                                )
+                                Spacer(Modifier.height(1.dp))
+                                Text(
+                                    text          = if (event.countdownNumber == "1") "DAY LEFT" else "DAYS LEFT",
+                                    fontSize      = 8.sp,
+                                    fontWeight    = FontWeight.Bold,
+                                    color         = config.textColor.copy(alpha = 0.9f),
+                                    letterSpacing = 0.4.sp,
+                                    textAlign     = TextAlign.Center
+                                )
+                            }
                         }
                     }
                 }

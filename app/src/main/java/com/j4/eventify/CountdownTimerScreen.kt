@@ -366,8 +366,16 @@ fun CountdownTimerScreen(
                                 }
                             }
                             Spacer(modifier = Modifier.height(16.dp))
+
+                            // ── THE FIX: Dynamically add Days to the text if the event spans multiple days ──
+                            val timeString = when {
+                                days == 1L -> String.format(Locale.US, "Ends in 1 day, %02d:%02d:%02d", hours, minutes, seconds)
+                                days > 1L  -> String.format(Locale.US, "Ends in %d days, %02d:%02d:%02d", days, hours, minutes, seconds)
+                                else       -> String.format(Locale.US, "Ends in %02d:%02d:%02d", hours, minutes, seconds)
+                            }
+
                             Text(
-                                text = String.format(Locale.US, "Ends in %02d:%02d:%02d", hours, minutes, seconds),
+                                text = timeString,
                                 fontSize = 22.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = textColor.copy(alpha = 0.8f)
