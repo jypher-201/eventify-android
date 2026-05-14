@@ -211,6 +211,7 @@ fun HomeScreen(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
+
     val prefs = remember { context.getSharedPreferences("eventify_settings", Context.MODE_PRIVATE) }
 
     var selectedFilter       by remember { mutableStateOf<EventType?>(null) }
@@ -453,10 +454,10 @@ fun HomeScreen(
                                 ) {
                                     items(listFilteredAndSorted, key = { "${it.id}_${it.rawStartMs}" }) { event ->
                                         SwipeableEventWrapper(
+                                            // ── THE FIX: Add a smooth animation modifier instead of the laggy sensor! ──
+                                            modifier = Modifier.animateItem(),
                                             onEdit = { onEditEvent(event.id) },
-                                            onDelete = {
-                                                eventToDelete = event
-                                            }
+                                            onDelete = { eventToDelete = event }
                                         ) {
                                             EventCard(
                                                 event          = event,
@@ -1481,6 +1482,7 @@ fun ModernAboutDialog(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SwipeableEventWrapper(
+    modifier: Modifier = Modifier, // ── ADD MODIFIER ──
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     content: @Composable () -> Unit
@@ -1499,22 +1501,31 @@ fun SwipeableEventWrapper(
                 else -> false
             }
         },
-        // ── THE FIX 2: Require a deliberate, 50% screen swipe to trigger! ──
-        positionalThreshold = { distance: Float -> distance * 0.5f }
+        // ── THE FIX: Force the user to swipe at least 60% of the screen.
+        // This makes it virtually impossible to trigger accidentally while scrolling! ──
+        positionalThreshold = { distance: Float -> distance * 0.60f }
     )
 
     SwipeToDismissBox(
         state = dismissState,
+        modifier = modifier, // ── APPLY MODIFIER HERE ──
         backgroundContent = {
             val direction = dismissState.dismissDirection
 
             val color by animateColorAsState(
-                targetValue = when (dismissState.targetValue) {
+                targetValue = when (direction) {
                     SwipeToDismissBoxValue.StartToEnd -> Color(0xFF10B981) // Emerald Green for Edit
                     SwipeToDismissBoxValue.EndToStart -> Color(0xFFEF4444) // Red for Delete
                     else -> Color.Transparent
                 },
                 label = "swipe_color"
+            )
+
+            // Optional polish: Make the icons scale up smoothly as you drag!
+            val scale by animateFloatAsState(
+                targetValue = if (dismissState.targetValue == SwipeToDismissBoxValue.Settled) 0.7f else 1f,
+                animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+                label = "icon_scale"
             )
 
             val alignment = when (direction) {
@@ -1539,7 +1550,13 @@ fun SwipeableEventWrapper(
                 contentAlignment = alignment
             ) {
                 if (direction != SwipeToDismissBoxValue.Settled) {
-                    Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(28.dp))
+                    Icon(
+                        icon,
+                        contentDescription = null,
+                        tint = Color.White,
+                        // ── THE FIX 2: Apply the smooth scale animation ──
+                        modifier = Modifier.size(28.dp).graphicsLayer { scaleX = scale; scaleY = scale }
+                    )
                 }
             }
         },
