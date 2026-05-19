@@ -5,6 +5,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -43,7 +45,6 @@ fun calculateNextOccurrence(startMs: Long, endMs: Long, repeatMode: String?, cur
     var currentEnd = endMs
     val duration = endMs - startMs
 
-    // ── THE FIX: Removed hardcoded "Asia/Manila" to prevent system clock desyncs ──
     val cal = java.util.Calendar.getInstance()
 
     val lower = repeatMode.lowercase()
@@ -57,7 +58,6 @@ fun calculateNextOccurrence(startMs: Long, endMs: Long, repeatMode: String?, cur
         else -> java.util.Calendar.DAY_OF_YEAR
     }
 
-    // Keep shifting into the future until the End Time passes 'Right Now'
     while (currentEnd < currentTime) {
         cal.timeInMillis = currentStart
         cal.add(unit, amount)
@@ -84,10 +84,10 @@ fun CountdownTimerScreen(
         EventType.HOLIDAY -> com.j4.eventify.components.EventTypeConfig(
             type = EventType.HOLIDAY,
             label = "Holidays",
-            gradientStart = Color(0xFF10B981), // Emerald Green
-            gradientEnd = Color(0xFF059669),   // Darker Green
+            gradientStart = Color(0xFF10B981),
+            gradientEnd = Color(0xFF059669),
             textColor = Color.White,
-            badgeColor = Color(0xFF047857)     // Deep Green
+            badgeColor = Color(0xFF047857)
         )
         EventType.CUSTOM -> {
             val liveCategory = registry.customTypes.find {
@@ -116,20 +116,13 @@ fun CountdownTimerScreen(
         }
     }
 
-    // Safely figure out the Original End Time
     val originalEndMs = event.rawEndMs ?: if (event.isAllDay) event.rawStartMs + 86400000L else event.rawStartMs + 3600000L
-
-    // ── TIME TRAVEL ──
     val (activeStartMs, activeEndMs) = calculateNextOccurrence(event.rawStartMs, originalEndMs, event.repeatMode, currentTime)
 
-    // Determine the exact State of the event
     val isFinished = currentTime > activeEndMs
     val isOngoing = currentTime >= activeStartMs && currentTime <= activeEndMs
 
-    // Target the Start Time if upcoming, Target the End Time if ongoing!
     val targetTime = if (isOngoing) activeEndMs else activeStartMs
-
-    // Never allow negative numbers!
     val diffInMillis = (targetTime - currentTime).coerceAtLeast(0L)
 
     val days = java.util.concurrent.TimeUnit.MILLISECONDS.toDays(diffInMillis)
@@ -164,129 +157,157 @@ fun CountdownTimerScreen(
             .graphicsLayer { this.alpha = alpha }
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .navigationBarsPadding()
-                .padding(horizontal = 24.dp, vertical = 16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceBetween
+            modifier = Modifier.fillMaxSize()
         ) {
-            ModernCountdownTopBar(
-                onNavigateBack = onNavigateBack,
-                onEdit         = onEdit,
-                onDelete       = { showDeleteDialog = true },
-                textColor      = textColor
-            )
+            // ── 1. STICKY TOP BAR ──
+            // FIX: Chained padding for horizontal and top
+            Box(modifier = Modifier.padding(horizontal = 16.dp).padding(top = 8.dp)) {
+                ModernCountdownTopBar(
+                    onNavigateBack = onNavigateBack,
+                    onEdit         = onEdit,
+                    onDelete       = { showDeleteDialog = true },
+                    textColor      = textColor
+                )
+            }
+
+            // ── 2. SCROLLABLE BODY ──
+            val scrollState = rememberScrollState()
             Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(32.dp),
                 modifier = Modifier
-                    .weight(1f)
-                    .wrapContentHeight(Alignment.CenterVertically)
+                    .fillMaxSize()
+                    .verticalScroll(scrollState)
+                    .navigationBarsPadding()
+                    // FIX: Chained padding for horizontal and bottom!
+                    .padding(horizontal = 24.dp).padding(bottom = 32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text(
-                    text          = event.title.uppercase(),
-                    fontSize      = 28.sp,
-                    fontWeight    = FontWeight.Black,
-                    color         = textColor,
-                    textAlign     = TextAlign.Center,
-                    maxLines      = 2,
-                    letterSpacing = 1.5.sp,
-                    fontFamily    = FontFamily.Default
-                )
+                Spacer(modifier = Modifier.height(16.dp))
 
-                Box(
-                    modifier = Modifier
-                        .width(150.dp)
-                        .height(4.dp)
-                        .clip(RoundedCornerShape(2.dp))
-                        .background(textColor)
-                )
-
-                Box(
-                    modifier         = Modifier.size(340.dp),
-                    contentAlignment = Alignment.Center
+                // --- TITLE & CIRCLES ---
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(32.dp),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(320.dp)
-                            .rotate(rotation)
-                            .border(8.dp, textColor.copy(alpha = 0.3f), CircleShape)
-                    )
-                    Box(
-                        modifier = Modifier
-                            .size(280.dp)
-                            .rotate(-rotation / 2)
-                            .border(6.dp, textColor.copy(alpha = 0.2f), CircleShape)
-                    )
-                    Box(
-                        modifier = Modifier
-                            .size(240.dp)
-                            .rotate(rotation * 1.5f)
-                            .border(4.dp, textColor.copy(alpha = 0.15f), CircleShape)
+                    Text(
+                        text          = event.title.uppercase(),
+                        fontSize      = 28.sp,
+                        fontWeight    = FontWeight.Black,
+                        color         = textColor,
+                        textAlign     = TextAlign.Center,
+                        maxLines      = 2,
+                        letterSpacing = 1.5.sp,
+                        fontFamily    = FontFamily.Default
                     )
 
-                    // ─────────────────────────────────────────────
-                    // UI STATE MACHINE (Finished vs Ongoing vs Upcoming)
-                    // ─────────────────────────────────────────────
-                    if (isFinished) {
-                        // ── STATE 1: FINISHED (Memory Tracker) ──
-                        val timeSinceMs = currentTime - activeEndMs
-                        val sinceDays = java.util.concurrent.TimeUnit.MILLISECONDS.toDays(timeSinceMs)
-                        val sinceHours = java.util.concurrent.TimeUnit.MILLISECONDS.toHours(timeSinceMs) % 24
-                        val sinceMinutes = java.util.concurrent.TimeUnit.MILLISECONDS.toMinutes(timeSinceMs) % 60
+                    Box(
+                        modifier = Modifier
+                            .width(150.dp)
+                            .height(4.dp)
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(textColor)
+                    )
 
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Surface(
-                                shape = RoundedCornerShape(20.dp),
-                                color = textColor.copy(alpha = 0.1f),
-                                border = BorderStroke(1.dp, textColor.copy(alpha = 0.3f))
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    Box(
+                        modifier         = Modifier.size(340.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(320.dp)
+                                .rotate(rotation)
+                                .border(8.dp, textColor.copy(alpha = 0.3f), CircleShape)
+                        )
+                        Box(
+                            modifier = Modifier
+                                .size(280.dp)
+                                .rotate(-rotation / 2)
+                                .border(6.dp, textColor.copy(alpha = 0.2f), CircleShape)
+                        )
+                        Box(
+                            modifier = Modifier
+                                .size(240.dp)
+                                .rotate(rotation * 1.5f)
+                                .border(4.dp, textColor.copy(alpha = 0.15f), CircleShape)
+                        )
+
+                        // ─────────────────────────────────────────────
+                        // UI STATE MACHINE (Finished vs Ongoing vs Upcoming)
+                        // ─────────────────────────────────────────────
+                        if (isFinished) {
+                            val timeSinceMs = currentTime - activeEndMs
+                            val sinceDays = java.util.concurrent.TimeUnit.MILLISECONDS.toDays(timeSinceMs)
+                            val sinceHours = java.util.concurrent.TimeUnit.MILLISECONDS.toHours(timeSinceMs) % 24
+                            val sinceMinutes = java.util.concurrent.TimeUnit.MILLISECONDS.toMinutes(timeSinceMs) % 60
+
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Surface(
+                                    shape = RoundedCornerShape(20.dp),
+                                    color = textColor.copy(alpha = 0.1f),
+                                    border = BorderStroke(1.dp, textColor.copy(alpha = 0.3f))
                                 ) {
-                                    Icon(
-                                        Icons.Default.Check,
-                                        contentDescription = null,
-                                        tint = textColor.copy(alpha = 0.6f),
-                                        modifier = Modifier.size(14.dp)
-                                    )
-                                    Text(
-                                        "COMPLETED",
-                                        color = textColor.copy(alpha = 0.6f),
-                                        fontWeight = FontWeight.Bold,
-                                        letterSpacing = 1.sp,
-                                        fontSize = 12.sp
-                                    )
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Check,
+                                            contentDescription = null,
+                                            tint = textColor.copy(alpha = 0.6f),
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                        Text(
+                                            "COMPLETED",
+                                            color = textColor.copy(alpha = 0.6f),
+                                            fontWeight = FontWeight.Bold,
+                                            letterSpacing = 1.sp,
+                                            fontSize = 12.sp
+                                        )
+                                    }
                                 }
-                            }
 
-                            Spacer(modifier = Modifier.height(24.dp))
+                                Spacer(modifier = Modifier.height(24.dp))
 
-                            Text(
-                                text = "Ended",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = textColor.copy(alpha = 0.5f),
-                                letterSpacing = 2.sp
-                            )
+                                Text(
+                                    text = "Ended",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = textColor.copy(alpha = 0.5f),
+                                    letterSpacing = 2.sp
+                                )
 
-                            Spacer(modifier = Modifier.height(8.dp))
+                                Spacer(modifier = Modifier.height(8.dp))
 
-                            Row(
-                                horizontalArrangement = Arrangement.Center,
-                                verticalAlignment = Alignment.Bottom
-                            ) {
-                                if (sinceDays > 0) {
+                                Row(
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment = Alignment.Bottom
+                                ) {
+                                    if (sinceDays > 0) {
+                                        AnimatedTimeUnit(
+                                            value = String.format(Locale.US, "%02d", sinceDays),
+                                            label = "DAYS",
+                                            color = textColor.copy(alpha = 0.7f),
+                                            numberSize = 48.sp,
+                                            labelSize = 10.sp
+                                        )
+                                        Text(
+                                            text = ":",
+                                            fontSize = 48.sp,
+                                            fontWeight = FontWeight.Black,
+                                            color = textColor.copy(alpha = 0.3f),
+                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                                        )
+                                    }
+
                                     AnimatedTimeUnit(
-                                        value = String.format(Locale.US, "%02d", sinceDays),
-                                        label = "DAYS",
+                                        value = String.format(Locale.US, "%02d", sinceHours),
+                                        label = "HOURS",
                                         color = textColor.copy(alpha = 0.7f),
                                         numberSize = 48.sp,
                                         labelSize = 10.sp
                                     )
+
                                     Text(
                                         text = ":",
                                         fontSize = 48.sp,
@@ -294,228 +315,211 @@ fun CountdownTimerScreen(
                                         color = textColor.copy(alpha = 0.3f),
                                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
                                     )
-                                }
 
-                                AnimatedTimeUnit(
-                                    value = String.format(Locale.US, "%02d", sinceHours),
-                                    label = "HOURS",
-                                    color = textColor.copy(alpha = 0.7f),
-                                    numberSize = 48.sp,
-                                    labelSize = 10.sp
-                                )
-
-                                Text(
-                                    text = ":",
-                                    fontSize = 48.sp,
-                                    fontWeight = FontWeight.Black,
-                                    color = textColor.copy(alpha = 0.3f),
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
-                                )
-
-                                AnimatedTimeUnit(
-                                    value = String.format(Locale.US, "%02d", sinceMinutes),
-                                    label = "MINS",
-                                    color = textColor.copy(alpha = 0.7f),
-                                    numberSize = 48.sp,
-                                    labelSize = 10.sp
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Text(
-                                text = "ago",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = textColor.copy(alpha = 0.5f),
-                                letterSpacing = 2.sp
-                            )
-                        }
-
-                    } else if (isOngoing) {
-                        // ── STATE 2: HAPPENING NOW ──
-                        val infinitePulse = rememberInfiniteTransition(label = "pulse")
-                        val pulseAlpha by infinitePulse.animateFloat(
-                            initialValue = 0.3f,
-                            targetValue = 1f,
-                            animationSpec = infiniteRepeatable(
-                                animation = tween(1000, easing = FastOutSlowInEasing),
-                                repeatMode = RepeatMode.Reverse
-                            ),
-                            label = "pulse_alpha"
-                        )
-
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Surface(
-                                shape = RoundedCornerShape(20.dp),
-                                color = textColor.copy(alpha = 0.15f * pulseAlpha),
-                                border = BorderStroke(1.dp, textColor.copy(alpha = pulseAlpha))
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(textColor.copy(alpha = pulseAlpha)))
-                                    Text(
-                                        "HAPPENING NOW",
-                                        color = textColor.copy(alpha = pulseAlpha),
-                                        fontWeight = FontWeight.Bold,
-                                        letterSpacing = 1.sp,
-                                        fontSize = 14.sp
+                                    AnimatedTimeUnit(
+                                        value = String.format(Locale.US, "%02d", sinceMinutes),
+                                        label = "MINS",
+                                        color = textColor.copy(alpha = 0.7f),
+                                        numberSize = 48.sp,
+                                        labelSize = 10.sp
                                     )
                                 }
-                            }
-                            Spacer(modifier = Modifier.height(16.dp))
 
-                            // ── THE FIX: Dynamically add Days to the text if the event spans multiple days ──
-                            val timeString = when {
-                                days == 1L -> String.format(Locale.US, "Ends in 1 day, %02d:%02d:%02d", hours, minutes, seconds)
-                                days > 1L  -> String.format(Locale.US, "Ends in %d days, %02d:%02d:%02d", days, hours, minutes, seconds)
-                                else       -> String.format(Locale.US, "Ends in %02d:%02d:%02d", hours, minutes, seconds)
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Text(
+                                    text = "ago",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = textColor.copy(alpha = 0.5f),
+                                    letterSpacing = 2.sp
+                                )
                             }
 
-                            Text(
-                                text = timeString,
-                                fontSize = 22.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = textColor.copy(alpha = 0.8f)
+                        } else if (isOngoing) {
+                            val infinitePulse = rememberInfiniteTransition(label = "pulse")
+                            val pulseAlpha by infinitePulse.animateFloat(
+                                initialValue = 0.3f,
+                                targetValue = 1f,
+                                animationSpec = infiniteRepeatable(
+                                    animation = tween(1000, easing = FastOutSlowInEasing),
+                                    repeatMode = RepeatMode.Reverse
+                                ),
+                                label = "pulse_alpha"
                             )
-                        }
-                    } else {
-                        // ── STATE 3: UPCOMING ──
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(20.dp)
-                        ) {
-                            val showDays    = days > 0
-                            val showHours   = hours > 0 || showDays
-                            val showMinutes = minutes > 0 || showHours
-                            val showSeconds = true
 
-                            val activeUnits = listOf(showDays, showHours, showMinutes, showSeconds).count { it }
-
-                            val numberSize = when (activeUnits) {
-                                1    -> 72.sp
-                                2    -> 64.sp
-                                3    -> 58.sp
-                                else -> 56.sp
-                            }
-                            val labelSize = when (activeUnits) {
-                                1    -> 14.sp
-                                2    -> 12.sp
-                                else -> 11.sp
-                            }
-
-                            if (showDays || showHours) {
-                                Row(
-                                    horizontalArrangement = Arrangement.Center,
-                                    verticalAlignment     = Alignment.Top
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Surface(
+                                    shape = RoundedCornerShape(20.dp),
+                                    color = textColor.copy(alpha = 0.15f * pulseAlpha),
+                                    border = BorderStroke(1.dp, textColor.copy(alpha = pulseAlpha))
                                 ) {
-                                    if (showDays) {
-                                        AnimatedTimeUnit(
-                                            value      = String.format(Locale.US, "%02d", days),
-                                            label      = "DAYS",
-                                            color      = textColor,
-                                            numberSize = numberSize,
-                                            labelSize  = labelSize
-                                        )
-                                        if (showHours) {
-                                            Text(
-                                                text       = ":",
-                                                fontSize   = numberSize,
-                                                fontWeight = FontWeight.Black,
-                                                color      = textColor,
-                                                modifier   = Modifier.padding(horizontal = 12.dp),
-                                                fontFamily = FontFamily.Default
-                                            )
-                                        }
-                                    }
-                                    if (showHours) {
-                                        AnimatedTimeUnit(
-                                            value      = String.format(Locale.US, "%02d", hours),
-                                            label      = "HOURS",
-                                            color      = textColor,
-                                            numberSize = numberSize,
-                                            labelSize  = labelSize
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(textColor.copy(alpha = pulseAlpha)))
+                                        Text(
+                                            "HAPPENING NOW",
+                                            color = textColor.copy(alpha = pulseAlpha),
+                                            fontWeight = FontWeight.Bold,
+                                            letterSpacing = 1.sp,
+                                            fontSize = 14.sp
                                         )
                                     }
                                 }
-                            }
+                                Spacer(modifier = Modifier.height(16.dp))
 
-                            if (showMinutes || showSeconds) {
-                                Row(
-                                    horizontalArrangement = Arrangement.Center,
-                                    verticalAlignment     = Alignment.Top
-                                ) {
-                                    if (showMinutes) {
-                                        AnimatedTimeUnit(
-                                            value      = String.format(Locale.US, "%02d", minutes),
-                                            label      = "MINS",
-                                            color      = textColor,
-                                            numberSize = numberSize,
-                                            labelSize  = labelSize
-                                        )
-                                        if (showSeconds) {
-                                            Text(
-                                                text       = ":",
-                                                fontSize   = numberSize,
-                                                fontWeight = FontWeight.Black,
+                                val timeString = when {
+                                    days == 1L -> String.format(Locale.US, "Ends in 1 day, %02d:%02d:%02d", hours, minutes, seconds)
+                                    days > 1L  -> String.format(Locale.US, "Ends in %d days, %02d:%02d:%02d", days, hours, minutes, seconds)
+                                    else       -> String.format(Locale.US, "Ends in %02d:%02d:%02d", hours, minutes, seconds)
+                                }
+
+                                Text(
+                                    text = timeString,
+                                    fontSize = 22.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = textColor.copy(alpha = 0.8f)
+                                )
+                            }
+                        } else {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(20.dp)
+                            ) {
+                                val showDays    = days > 0
+                                val showHours   = hours > 0 || showDays
+                                val showMinutes = minutes > 0 || showHours
+                                val showSeconds = true
+
+                                val activeUnits = listOf(showDays, showHours, showMinutes, showSeconds).count { it }
+
+                                val numberSize = when (activeUnits) {
+                                    1    -> 72.sp
+                                    2    -> 64.sp
+                                    3    -> 58.sp
+                                    else -> 56.sp
+                                }
+                                val labelSize = when (activeUnits) {
+                                    1    -> 14.sp
+                                    2    -> 12.sp
+                                    else -> 11.sp
+                                }
+
+                                if (showDays || showHours) {
+                                    Row(
+                                        horizontalArrangement = Arrangement.Center,
+                                        verticalAlignment     = Alignment.Top
+                                    ) {
+                                        if (showDays) {
+                                            AnimatedTimeUnit(
+                                                value      = String.format(Locale.US, "%02d", days),
+                                                label      = "DAYS",
                                                 color      = textColor,
-                                                modifier   = Modifier.padding(horizontal = 12.dp),
-                                                fontFamily = FontFamily.Default
+                                                numberSize = numberSize,
+                                                labelSize  = labelSize
+                                            )
+                                            if (showHours) {
+                                                Text(
+                                                    text       = ":",
+                                                    fontSize   = numberSize,
+                                                    fontWeight = FontWeight.Black,
+                                                    color      = textColor,
+                                                    modifier   = Modifier.padding(horizontal = 12.dp),
+                                                    fontFamily = FontFamily.Default
+                                                )
+                                            }
+                                        }
+                                        if (showHours) {
+                                            AnimatedTimeUnit(
+                                                value      = String.format(Locale.US, "%02d", hours),
+                                                label      = "HOURS",
+                                                color      = textColor,
+                                                numberSize = numberSize,
+                                                labelSize  = labelSize
                                             )
                                         }
                                     }
-                                    if (showSeconds) {
-                                        AnimatedTimeUnit(
-                                            value      = String.format(Locale.US, "%02d", seconds),
-                                            label      = "SECS",
-                                            color      = textColor,
-                                            numberSize = numberSize,
-                                            labelSize  = labelSize
-                                        )
+                                }
+
+                                if (showMinutes || showSeconds) {
+                                    Row(
+                                        horizontalArrangement = Arrangement.Center,
+                                        verticalAlignment     = Alignment.Top
+                                    ) {
+                                        if (showMinutes) {
+                                            AnimatedTimeUnit(
+                                                value      = String.format(Locale.US, "%02d", minutes),
+                                                label      = "MINS",
+                                                color      = textColor,
+                                                numberSize = numberSize,
+                                                labelSize  = labelSize
+                                            )
+                                            if (showSeconds) {
+                                                Text(
+                                                    text       = ":",
+                                                    fontSize   = numberSize,
+                                                    fontWeight = FontWeight.Black,
+                                                    color      = textColor,
+                                                    modifier   = Modifier.padding(horizontal = 12.dp),
+                                                    fontFamily = FontFamily.Default
+                                                )
+                                            }
+                                        }
+                                        if (showSeconds) {
+                                            AnimatedTimeUnit(
+                                                value      = String.format(Locale.US, "%02d", seconds),
+                                                label      = "SECS",
+                                                color      = textColor,
+                                                numberSize = numberSize,
+                                                labelSize  = labelSize
+                                            )
+                                        }
                                     }
                                 }
                             }
                         }
                     }
                 }
-            }
 
-            Column(
-                modifier            = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                ModernInfoCard(
-                    icon      = Icons.Default.CalendarToday,
-                    title     = if (event.isAllDay) "Date" else "Date & Time",
-                    content   = event.dateTime.replace(" at ", "\n"),
-                    textColor = textColor
-                )
-                ModernInfoCard(
-                    icon      = Icons.AutoMirrored.Filled.Label,
-                    title     = "Event Type",
-                    content   = config.label,
-                    textColor = textColor
-                )
+                Spacer(modifier = Modifier.height(48.dp))
 
-                // ── ADD THIS NEW LOCATION CARD ──
-                if (!event.locationName.isNullOrBlank()) {
+                // --- INFO CARDS ---
+                Column(
+                    modifier            = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
                     ModernInfoCard(
-                        icon      = Icons.Default.LocationOn,
-                        title     = "Location",
-                        content   = event.locationName,
+                        icon      = Icons.Default.CalendarToday,
+                        title     = if (event.isAllDay) "Date" else "Date & Time",
+                        content   = event.dateTime.replace(" at ", "\n"),
                         textColor = textColor
                     )
-                }
-
-                if (event.notes.isNotEmpty()) {
                     ModernInfoCard(
-                        icon      = Icons.AutoMirrored.Filled.Notes,
-                        title     = "Notes",
-                        content   = event.notes,
+                        icon      = Icons.AutoMirrored.Filled.Label,
+                        title     = "Event Type",
+                        content   = config.label,
                         textColor = textColor
                     )
+
+                    if (!event.locationName.isNullOrBlank()) {
+                        ModernInfoCard(
+                            icon      = Icons.Default.LocationOn,
+                            title     = "Location",
+                            content   = event.locationName,
+                            textColor = textColor
+                        )
+                    }
+
+                    if (event.notes.isNotEmpty()) {
+                        ModernInfoCard(
+                            icon      = Icons.AutoMirrored.Filled.Notes,
+                            title     = "Notes",
+                            content   = event.notes,
+                            textColor = textColor
+                        )
+                    }
                 }
             }
         }
