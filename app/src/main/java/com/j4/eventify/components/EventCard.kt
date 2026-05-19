@@ -188,12 +188,14 @@ fun EventCard(
         label = "shadow_elevation"
     )
 
-    // ── NEW: Calculate the exact state of the event! ──
+    // ── Calculate the exact state of the event! ──
     val now = System.currentTimeMillis()
     val fallbackDuration = if (event.isAllDay) 86400000L else 3600000L
     val endTime = event.rawEndMs ?: (event.rawStartMs + fallbackDuration)
 
     val isPassed = endTime < now
+    // ── THE FIX: Check if the event is currently happening right this second! ──
+    val isOngoing = now >= event.rawStartMs && now <= endTime
 
     val calNow = java.util.Calendar.getInstance()
     val calEvent = java.util.Calendar.getInstance().apply { timeInMillis = event.rawStartMs }
@@ -326,6 +328,24 @@ fun EventCard(
                                     color      = config.textColor,
                                     textAlign  = TextAlign.Center,
                                     letterSpacing = 0.5.sp
+                                )
+                            } else if (isOngoing) {
+                                // ── THE FIX: Better font balancing for readability ──
+                                Text(
+                                    text          = "HAPPENING",
+                                    fontSize      = 9.sp,  // ── Boosted from 7.sp ──
+                                    fontWeight    = FontWeight.Black,
+                                    color         = config.textColor.copy(alpha = 0.95f),
+                                    letterSpacing = 0.sp,  // ── Removed spacing to make it fit ──
+                                    textAlign     = TextAlign.Center
+                                )
+                                Text(
+                                    text       = "NOW",
+                                    fontSize   = 16.sp, // ── Shrunk from 18.sp to balance ──
+                                    fontWeight = FontWeight.Black,
+                                    color      = config.textColor,
+                                    lineHeight = 16.sp,
+                                    textAlign  = TextAlign.Center
                                 )
                             } else if (isToday) {
                                 Text(
